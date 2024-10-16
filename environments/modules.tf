@@ -1,5 +1,8 @@
+# here goes all modules, same as main.tf does today 
+# "gateway" to all modules
+# resources, references, etc.
 module "vpc" {
-  source = "./modules/vpc"
+  source = "../modules/networking"
 
   cluster_name = var.cluster_name
   env = var.env
