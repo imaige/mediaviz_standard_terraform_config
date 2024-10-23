@@ -1,6 +1,6 @@
 // modules/vpc/main.tf
 provider "aws" {
-  region = "us-east-2" // Change to your desired region
+  region = "us-east-2"
 }
 
 module "vpc" {
@@ -8,14 +8,14 @@ module "vpc" {
   version = "~> 4.0"
 
   name = "${var.cluster_name}-${var.env}-vpc"
-  cidr = "10.0.0.0/16"
+  cidr = "192.168.0.0/16"
 
   azs             = data.aws_availability_zones.available.names
-  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
-  private_subnets = ["10.0.3.0/24", "10.0.4.0/24"]
+  public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"] 
+  private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
 
   enable_nat_gateway = true
-  single_nat_gateway = true
+  single_nat_gateway = true  # note: may want to swap to False when creating prod cluster
 
   tags = {
     Terraform   = "true"

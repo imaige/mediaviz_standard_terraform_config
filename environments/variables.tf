@@ -6,13 +6,13 @@ variable "env" {
   default     = "dev"
 }
 
+variable "cluster_name" {
+  description = "The name of the EKS cluster"
+  type        = string
+}
+
 variable "aws_region" {
   description = "The region name"
   type        = string
   default     = "dev"
-}
-
-variable "cluster_name" {
-  description = "The name of the EKS cluster"
-  type        = string
 }
