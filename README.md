@@ -2,7 +2,7 @@ to initialize:
 terraform init -backend-config=dev/backend-config.hcl
 
 next, run validate:
-terraform validate
+terraform validate -var-file dev/terraform.tfvars
 
 to plan:
 terraform plan -var-file dev/terraform.tfvars -out plan.out
