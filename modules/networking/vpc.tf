@@ -21,6 +21,16 @@ module "vpc" {
     Terraform   = "true"
     Environment = var.cluster_name
   }
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+    "Environment"            = var.cluster_name
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+    "Environment"                     = var.cluster_name
+  }
 }
 
 data "aws_availability_zones" "available" {}
