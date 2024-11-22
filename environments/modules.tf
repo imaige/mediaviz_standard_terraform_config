@@ -34,14 +34,14 @@ module "eks" {
 
   # EKS Managed Node Group(s)
   eks_managed_node_group_defaults = {
-    instance_types = ["t3.medium"]
+    instance_types = var.eks_primary_instance_type
   }
 
   eks_managed_node_groups = {
     primary_node_group = {
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
+      instance_types = var.eks_primary_instance_type
 
       min_size     = 3
       max_size     = 10
@@ -57,7 +57,7 @@ module "eks" {
     # One access entry with a policy associated
     example = {
       kubernetes_groups = []
-      principal_arn     = "arn:aws:iam::379283424934:role/AmazonEKSClusterRole"
+      principal_arn     = "arn:aws:iam::${var.aws_account_id}:role/AmazonEKSClusterRole"
 
       policy_associations = {
         example = {

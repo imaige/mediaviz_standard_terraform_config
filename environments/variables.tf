@@ -16,3 +16,15 @@ variable "aws_region" {
   type        = string
   default     = "dev"
 }
+
+variable "aws_account_id" {
+  description = "AWS account ID"
+  type        = string
+  default     = "dev"
+}
+
+variable "eks_primary_instance_type" {
+  description = "The region name"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
