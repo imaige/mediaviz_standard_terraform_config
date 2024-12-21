@@ -1,9 +1,9 @@
 variable "cluster_name" {
-  description = "The cluster name"
+  description = "Name of the EKS cluster"
   type        = string
 }
 
 variable "env" {
-  description = "The environment name (e.g., dev, staging, prod)"
+  description = "Environment name (dev, prod, etc)"
   type        = string
 }
