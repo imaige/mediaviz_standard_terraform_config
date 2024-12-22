@@ -5,7 +5,7 @@ terraform {
   backend "s3" {
     bucket = "mediaviz-terraform-backend-config-dev"
     key    = "terraform.tfstate"
-    region = "us-east-2"  # since your EKS cluster is in us-east-2
+    region = "us-east-2" # since your EKS cluster is in us-east-2
   }
 
   # cloud providers
