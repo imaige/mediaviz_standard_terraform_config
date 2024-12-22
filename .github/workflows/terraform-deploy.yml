@@ -3,32 +3,32 @@ name: 'Terraform Deploy'
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'terraform/**'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'terraform/**'
 
 permissions:
   id-token: write
   contents: read
 
 env:
-  AWS_REGION: us-east-2                   # Change to your region
-  TERRAFORM_VERSION: "1.10.3"              # Specify your Terraform version
-  SSO_START_URL: "https://d-9a677e96f7.awsapps.com/start"   # Your AWS SSO URL
-  SSO_ROLE_NAME: "TerraformDeployRole"    # Your SSO role name
-  SSO_ACCOUNT_ID: "379283424934"          # Your AWS account ID
+  AWS_REGION: us-east-2
+  TERRAFORM_VERSION: "1.10.3"
+  SSO_START_URL: "https://d-9a677e96f7.awsapps.com/start"
+  SSO_ROLE_NAME: "TerraformDeployRole"
+  SSO_ACCOUNT_ID: "379283424934"
 
 jobs:
   terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        environment: [dev, prod]
+    environment: ${{ matrix.environment }}
+    
     defaults:
       run:
-        working-directory: ./terraform
+        working-directory: ./environments/${{ matrix.environment }}
 
     steps:
       - name: Checkout Repository
@@ -54,10 +54,6 @@ jobs:
       - name: Terraform Init
         id: init
         run: terraform init
-        env:
-          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
 
       - name: Terraform Plan
         id: plan
@@ -74,7 +70,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\` for ${{ matrix.environment }}
             <details><summary>Show Plan</summary>
             \`\`\`\n
             ${process.env.PLAN}
@@ -87,6 +83,7 @@ jobs:
               body: output
             })
 
-    #   - name: Terraform Apply
-    #     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    #     run: terraform apply -auto-approve
+      # Uncomment when ready for production deployments
+      # - name: Terraform Apply
+      #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      #   run: terraform apply -auto-approve
