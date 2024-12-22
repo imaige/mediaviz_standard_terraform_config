@@ -37,6 +37,7 @@ module "s3" {
   retention_days       = var.retention_days
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
+  replica_kms_key_id   = module.security.kms_key_id
 }
 
 module "lambda" {

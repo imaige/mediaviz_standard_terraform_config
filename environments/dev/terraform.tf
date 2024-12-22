@@ -3,9 +3,11 @@ terraform {
 
   # where to store state files
   backend "s3" {
-    bucket = "mediaviz-terraform-backend-config-dev"
-    key    = "terraform.tfstate"
-    region = "us-east-2" # since your EKS cluster is in us-east-2
+    bucket         = "mediaviz-terraform-backend-config-dev"
+    key            = "terraform.tfstate"
+    region         = "us-east-2"
+    dynamodb_table = "terraform-state-lock"  # Add this line for state locking
+    encrypt        = true
   }
 
   # cloud providers

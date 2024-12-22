@@ -26,6 +26,11 @@ variable "kms_key_arn" {
 }
 
 variable "kms_key_id" {
-  description = "ID of the KMS key for encryption"
+  description = "KMS key ID for encryption"
+  type        = string
+}
+
+variable "replica_kms_key_id" {
+  description = "KMS key ID for replica bucket encryption"
   type        = string
 }

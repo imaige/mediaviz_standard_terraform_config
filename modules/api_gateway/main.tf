@@ -91,6 +91,13 @@ resource "aws_api_gateway_stage" "api_stage" {
   # Enable caching
   cache_cluster_enabled = true
   cache_cluster_size   = "0.5"  # Smallest available size
+
+  client_certificate_id = aws_api_gateway_client_certificate.api_cert.id
+}
+
+# Add client certificate
+resource "aws_api_gateway_client_certificate" "api_cert" {
+  description = "Client certificate for ${var.project_name}-${var.env}"
 }
 
 # Create log group for API Gateway logs
@@ -131,6 +138,7 @@ resource "aws_api_gateway_method" "upload_options" {
   resource_id   = aws_api_gateway_resource.upload.id
   http_method   = "OPTIONS"
   authorization = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.validator.id  
 }
 
 resource "aws_api_gateway_integration" "options_integration" {
@@ -141,6 +149,18 @@ resource "aws_api_gateway_integration" "options_integration" {
 
   request_templates = {
     "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_settings" "all" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+  stage_name  = aws_api_gateway_stage.api_stage.stage_name
+  method_path = "*/*"
+
+  settings {
+    logging_level       = "INFO"
+    data_trace_enabled = true
+    metrics_enabled    = true
   }
 }
 
