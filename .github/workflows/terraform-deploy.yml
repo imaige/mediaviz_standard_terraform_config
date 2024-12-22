@@ -12,6 +12,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  security-events: write  # Required for GitHub code scanning alerts
 
 env:
   AWS_REGION: us-east-2
@@ -21,8 +22,32 @@ env:
   SSO_ACCOUNT_ID: "379283424934"
 
 jobs:
+  security-scan:
+    name: 'Security Scan'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          output_format: cli,sarif
+          output_file_path: console,results.sarif
+          soft_fail: true  # Don't fail the build, but report issues
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        if: success() || failure()
+        with:
+          sarif_file: results.sarif
+
   plan:
     name: 'Terraform Plan'
+    needs: security-scan
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     defaults:
@@ -83,6 +108,7 @@ jobs:
 
   apply:
     name: 'Terraform Apply'
+    needs: security-scan
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     defaults:
