@@ -1,6 +1,6 @@
 resource "aws_api_gateway_rest_api" "image_upload" {
   name = "${var.project_name}-${var.env}-upload-api"
-  
+
   # Enable endpoint configuration
   endpoint_configuration {
     types = ["REGIONAL"]
@@ -20,8 +20,8 @@ resource "aws_wafregional_web_acl_association" "api_waf" {
 # Add request validation
 resource "aws_api_gateway_request_validator" "validator" {
   name                        = "validator"
-  rest_api_id                = aws_api_gateway_rest_api.image_upload.id
-  validate_request_body      = true
+  rest_api_id                 = aws_api_gateway_rest_api.image_upload.id
+  validate_request_body       = true
   validate_request_parameters = true
 }
 
@@ -30,9 +30,9 @@ resource "aws_api_gateway_method" "upload_post" {
   rest_api_id          = aws_api_gateway_rest_api.image_upload.id
   resource_id          = aws_api_gateway_resource.upload.id
   http_method          = "POST"
-  authorization        = "AWS_IAM"  # Changed from NONE to AWS_IAM
+  authorization        = "AWS_IAM" # Changed from NONE to AWS_IAM
   request_validator_id = aws_api_gateway_request_validator.validator.id
-  
+
   # Add request validation
   request_models = {
     "application/json" = aws_api_gateway_model.request_model.name
@@ -53,7 +53,7 @@ resource "aws_api_gateway_model" "request_model" {
   content_type = "application/json"
 
   schema = jsonencode({
-    type = "object"
+    type     = "object"
     required = ["image"]
     properties = {
       image = {
@@ -66,8 +66,8 @@ resource "aws_api_gateway_model" "request_model" {
 # Modify the stage to include logging and X-Ray tracing
 resource "aws_api_gateway_stage" "api_stage" {
   deployment_id = aws_api_gateway_deployment.api_deployment.id
-  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
-  stage_name   = var.stage_name
+  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
+  stage_name    = var.stage_name
 
   xray_tracing_enabled = true
 
@@ -75,22 +75,22 @@ resource "aws_api_gateway_stage" "api_stage" {
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_logs.arn
     format = jsonencode({
-      requestId     = "$context.requestId"
-      ip           = "$context.identity.sourceIp"
-      caller       = "$context.identity.caller"
-      user         = "$context.identity.user"
-      requestTime  = "$context.requestTime"
-      httpMethod   = "$context.httpMethod"
-      resourcePath = "$context.resourcePath"
-      status       = "$context.status"
-      protocol     = "$context.protocol"
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
       responseLength = "$context.responseLength"
     })
   }
 
   # Enable caching
   cache_cluster_enabled = true
-  cache_cluster_size   = "0.5"  # Smallest available size
+  cache_cluster_size    = "0.5" # Smallest available size
 
   client_certificate_id = aws_api_gateway_client_certificate.api_cert.id
 }
@@ -103,8 +103,8 @@ resource "aws_api_gateway_client_certificate" "api_cert" {
 # Create log group for API Gateway logs
 resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
-  retention_in_days = 365  # Changed from 30 to 365
-  kms_key_id       = var.kms_key_arn
+  retention_in_days = 365 # Changed from 30 to 365
+  kms_key_id        = var.kms_key_arn
 }
 
 # Modify deployment to include create before destroy
@@ -129,16 +129,16 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   http_method = aws_api_gateway_method.upload_post.http_method
 
   integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.lambda_invoke_arn
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arn
 }
 
 resource "aws_api_gateway_method" "upload_options" {
-  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
-  resource_id   = aws_api_gateway_resource.upload.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-  request_validator_id = aws_api_gateway_request_validator.validator.id  
+  rest_api_id          = aws_api_gateway_rest_api.image_upload.id
+  resource_id          = aws_api_gateway_resource.upload.id
+  http_method          = "OPTIONS"
+  authorization        = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.validator.id
 }
 
 resource "aws_api_gateway_integration" "options_integration" {
@@ -158,10 +158,11 @@ resource "aws_api_gateway_method_settings" "all" {
   method_path = "*/*"
 
   settings {
-    logging_level       = "INFO"
-    data_trace_enabled = false
-    metrics_enabled    = true
-    caching_enabled    = true
+    logging_level        = "INFO"
+    data_trace_enabled   = false
+    metrics_enabled      = true
+    caching_enabled      = true
+    cache_data_encrypted = true
   }
 }
 
