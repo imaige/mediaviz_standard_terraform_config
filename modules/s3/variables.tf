@@ -19,3 +19,13 @@ variable "retention_days" {
   type        = number
   default     = 30
 }
+
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for encryption"
+  type        = string
+}
+
+variable "kms_key_id" {
+  description = "ID of the KMS key for encryption"
+  type        = string
+}

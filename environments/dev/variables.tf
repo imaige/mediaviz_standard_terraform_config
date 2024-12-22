@@ -154,3 +154,8 @@ variable "project_name" {
   type        = string
   default     = "mediaviz-serverless" # This differentiates it from your EKS resources
 }
+
+variable "encrypted_env_var" {
+  description = "Encrypted environment variable for Lambda function"
+  type        = string
+}

@@ -1,5 +1,42 @@
 resource "aws_api_gateway_rest_api" "image_upload" {
   name = "${var.project_name}-${var.env}-upload-api"
+  
+  # Enable endpoint configuration
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+
+  # Enable Create before destroy
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_wafregional_web_acl_association" "api_waf" {
+  resource_arn = aws_api_gateway_stage.api_stage.arn
+  web_acl_id   = var.waf_acl_id
+}
+
+# Add request validation
+resource "aws_api_gateway_request_validator" "validator" {
+  name                        = "validator"
+  rest_api_id                = aws_api_gateway_rest_api.image_upload.id
+  validate_request_body      = true
+  validate_request_parameters = true
+}
+
+# Modify the POST method to include validation and authorization
+resource "aws_api_gateway_method" "upload_post" {
+  rest_api_id          = aws_api_gateway_rest_api.image_upload.id
+  resource_id          = aws_api_gateway_resource.upload.id
+  http_method          = "POST"
+  authorization        = "AWS_IAM"  # Changed from NONE to AWS_IAM
+  request_validator_id = aws_api_gateway_request_validator.validator.id
+  
+  # Add request validation
+  request_models = {
+    "application/json" = aws_api_gateway_model.request_model.name
+  }
 }
 
 resource "aws_api_gateway_resource" "upload" {
@@ -8,11 +45,75 @@ resource "aws_api_gateway_resource" "upload" {
   path_part   = "upload"
 }
 
-resource "aws_api_gateway_method" "upload_post" {
-  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
-  resource_id   = aws_api_gateway_resource.upload.id
-  http_method   = "POST"
-  authorization = "NONE"
+# Add request model for validation
+resource "aws_api_gateway_model" "request_model" {
+  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
+  name         = "ImageUploadModel"
+  description  = "Image upload request validation model"
+  content_type = "application/json"
+
+  schema = jsonencode({
+    type = "object"
+    required = ["image"]
+    properties = {
+      image = {
+        type = "string"
+      }
+    }
+  })
+}
+
+# Modify the stage to include logging and X-Ray tracing
+resource "aws_api_gateway_stage" "api_stage" {
+  deployment_id = aws_api_gateway_deployment.api_deployment.id
+  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
+  stage_name   = var.stage_name
+
+  xray_tracing_enabled = true
+
+  # Enable logging
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_logs.arn
+    format = jsonencode({
+      requestId     = "$context.requestId"
+      ip           = "$context.identity.sourceIp"
+      caller       = "$context.identity.caller"
+      user         = "$context.identity.user"
+      requestTime  = "$context.requestTime"
+      httpMethod   = "$context.httpMethod"
+      resourcePath = "$context.resourcePath"
+      status       = "$context.status"
+      protocol     = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
+  }
+
+  # Enable caching
+  cache_cluster_enabled = true
+  cache_cluster_size   = "0.5"  # Smallest available size
+}
+
+# Create log group for API Gateway logs
+resource "aws_cloudwatch_log_group" "api_logs" {
+  name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
+  retention_in_days = 365  # Changed from 30 to 365
+  kms_key_id       = var.kms_key_arn
+}
+
+# Modify deployment to include create before destroy
+resource "aws_api_gateway_deployment" "api_deployment" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.lambda_integration,
+    aws_api_gateway_integration.options_integration,
+    aws_api_gateway_method.upload_post,
+    aws_api_gateway_method.upload_options
+  ]
 }
 
 resource "aws_api_gateway_integration" "lambda_integration" {
@@ -25,7 +126,6 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   uri                    = var.lambda_invoke_arn
 }
 
-# CORS Configuration
 resource "aws_api_gateway_method" "upload_options" {
   rest_api_id   = aws_api_gateway_rest_api.image_upload.id
   resource_id   = aws_api_gateway_resource.upload.id
@@ -68,29 +168,4 @@ resource "aws_api_gateway_integration_response" "options_integration_response" {
     "method.response.header.Access-Control-Allow-Methods" = "'OPTIONS,POST'",
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
-}
-
-# Deployment
-resource "aws_api_gateway_deployment" "api_deployment" {
-  rest_api_id = aws_api_gateway_rest_api.image_upload.id
-
-  depends_on = [
-    aws_api_gateway_integration.lambda_integration,
-    aws_api_gateway_integration.options_integration
-  ]
-}
-
-resource "aws_api_gateway_stage" "api_stage" {
-  deployment_id = aws_api_gateway_deployment.api_deployment.id
-  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
-  stage_name   = var.stage_name
-}
-
-# Lambda Permission
-resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.image_upload.execution_arn}/*/*"
 }
