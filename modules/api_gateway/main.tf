@@ -159,8 +159,9 @@ resource "aws_api_gateway_method_settings" "all" {
 
   settings {
     logging_level       = "INFO"
-    data_trace_enabled = true
+    data_trace_enabled = false
     metrics_enabled    = true
+    caching_enabled    = true
   }
 }
 

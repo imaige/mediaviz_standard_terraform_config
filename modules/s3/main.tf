@@ -84,6 +84,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
     id     = "cleanup"
     status = "Enabled"
 
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+
     expiration {
       days = 365
     }
@@ -117,6 +121,12 @@ resource "aws_s3_bucket_logging" "image_upload" {
 
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket = aws_s3_bucket.image_upload.id
+
+  eventbridge = true
+}
+
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = aws_s3_bucket.replica.id
 
   eventbridge = true
 }
@@ -268,5 +278,29 @@ resource "aws_s3_bucket_versioning" "replica" {
   bucket = aws_s3_bucket.replica.id
   versioning_configuration {
     status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_logging" "replica" {
+  bucket = aws_s3_bucket.replica.id
+
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "log/"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "replica" {
+  bucket = aws_s3_bucket.replica.id
+
+  rule {
+    id     = "cleanup"
+    status = "Enabled"
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+
+    expiration {
+      days = 365
+    }
   }
 }
