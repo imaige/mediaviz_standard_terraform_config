@@ -57,3 +57,13 @@ variable "aws_account_id" {
   description = "AWS Account ID"
   type        = string
 }
+
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for encryption"
+  type        = string
+}
+
+variable "kms_key_id" {
+  description = "ID of the KMS key for encryption"
+  type        = string
+}
