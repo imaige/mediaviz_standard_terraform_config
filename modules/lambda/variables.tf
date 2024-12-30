@@ -70,4 +70,15 @@ variable "subnet_ids" {
 variable "vpc_id" {
   description = "ID of the VPC"
   type        = string
+  
+variable "output_bucket_name" {
+  type = string
+}
+
+variable "output_bucket_arn" {
+  type = string
+}
+
+variable "sqs_queue_arn" {
+  type = string
 }

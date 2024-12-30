@@ -54,6 +54,9 @@ module "lambda" {
   kms_key_arn                 = module.security.kms_key_arn
   kms_key_id                  = module.security.kms_key_id
   encrypted_env_var           = var.encrypted_env_var
+  sqs_queue_arn  = module.sqs.queue_arn
+  output_bucket_name = module.s3.processed_bucket_id
+  output_bucket_arn  = module.s3.processed_bucket_arn 
 }
 
 module "api_gateway" {
