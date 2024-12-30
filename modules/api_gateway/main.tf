@@ -33,6 +33,7 @@ resource "aws_api_gateway_method" "upload_post" {
   http_method   = "POST"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito.id
+  request_validator_id = aws_api_gateway_request_validator.validator.id
 
   request_parameters = {
     "method.request.header.Authorization" = true
