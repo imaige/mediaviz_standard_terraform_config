@@ -125,12 +125,6 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   eventbridge = true
 }
 
-resource "aws_s3_bucket_notification" "bucket_notification" {
-  bucket = aws_s3_bucket.replica.id
-
-  eventbridge = true
-}
-
 resource "aws_s3_bucket_cors_configuration" "image_upload" {
   bucket = aws_s3_bucket.image_upload.id
 
@@ -288,9 +282,6 @@ resource "aws_s3_bucket_logging" "replica" {
   target_prefix = "log/"
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "replica" {
-  bucket = aws_s3_bucket.replica.id
-  
 # Processed images bucket
 resource "aws_s3_bucket" "processed" {
   bucket = "${var.project_name}-${var.env}-processed"

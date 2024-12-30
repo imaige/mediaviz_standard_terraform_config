@@ -70,7 +70,8 @@ variable "subnet_ids" {
 variable "vpc_id" {
   description = "ID of the VPC"
   type        = string
-  
+}
+
 variable "output_bucket_name" {
   type = string
 }
