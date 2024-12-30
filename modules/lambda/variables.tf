@@ -41,3 +41,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "output_bucket_name" {
+  type = string
+}
+
+variable "output_bucket_arn" {
+  type = string
+}
+
+variable "sqs_queue_arn" {
+  type = string
+}

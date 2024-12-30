@@ -43,6 +43,9 @@ module "lambda" {
   s3_bucket_name = module.s3.bucket_id
   s3_bucket_arn  = module.s3.bucket_arn
   tags           = var.tags
+  sqs_queue_arn  = module.sqs.queue_arn
+  output_bucket_name = module.s3.processed_bucket_id
+  output_bucket_arn  = module.s3.processed_bucket_arn 
 }
 
 module "api_gateway" {
