@@ -19,7 +19,7 @@ variable "cluster_name" {
 variable "aws_account_id" {
   description = "AWS Account ID"
   type        = string
-  default     = "379283424934"  # Your current AWS account ID
+  default     = "379283424934" # Your current AWS account ID
 }
 
 variable "eks_primary_instance_type" {
@@ -33,9 +33,9 @@ variable "eks_managed_node_groups" {
   type        = map(any)
   default = {
     primary_node_group = {
-      min_size     = 3
-      max_size     = 10
-      desired_size = 3
+      min_size       = 3
+      max_size       = 10
+      desired_size   = 3
       instance_types = ["t3.medium"]
     }
   }
@@ -53,8 +53,8 @@ variable "cluster_addons" {
   default = {
     coredns                = {}
     eks-pod-identity-agent = {}
-    kube-proxy            = {}
-    vpc-cni               = {}
+    kube-proxy             = {}
+    vpc-cni                = {}
   }
 }
 
@@ -152,5 +152,10 @@ variable "eventbridge_rule_description" {
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "mediaviz-serverless"  # This differentiates it from your EKS resources
+  default     = "mediaviz-serverless" # This differentiates it from your EKS resources
 }
+
+# variable "encrypted_env_var" {
+#   description = "Encrypted environment variable for Lambda function"
+#   type        = string
+# }

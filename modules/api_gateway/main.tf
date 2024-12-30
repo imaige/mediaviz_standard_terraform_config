@@ -1,6 +1,48 @@
 # API Gateway
 resource "aws_api_gateway_rest_api" "image_upload" {
   name = "${var.project_name}-${var.env}-upload-api"
+
+  # Enable endpoint configuration
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+
+  # Enable Create before destroy
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# resource "aws_wafregional_web_acl_association" "api_waf" {
+#   resource_arn = aws_api_gateway_stage.api_stage.arn
+#   web_acl_id   = var.waf_acl_id
+# }
+
+resource "aws_wafv2_web_acl_association" "api_waf" {
+  resource_arn = aws_api_gateway_stage.api_stage.arn
+  web_acl_arn  = var.waf_acl_arn  # Changed from web_acl_id
+}
+
+# Add request validation
+resource "aws_api_gateway_request_validator" "validator" {
+  name                        = "validator"
+  rest_api_id                 = aws_api_gateway_rest_api.image_upload.id
+  validate_request_body       = true
+  validate_request_parameters = true
+}
+
+# Modify the POST method to include validation and authorization
+resource "aws_api_gateway_method" "upload_post" {
+  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
+  resource_id   = aws_api_gateway_resource.upload.id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  request_validator_id = aws_api_gateway_request_validator.validator.id
+
+  request_parameters = {
+    "method.request.header.Authorization" = true
+  }
 }
 
 # Cognito User Pool
@@ -16,7 +58,7 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   auto_verified_attributes = ["email"]
-  
+
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
   }
@@ -27,7 +69,7 @@ resource "aws_cognito_user_pool_client" "client" {
   user_pool_id = aws_cognito_user_pool.main.id
 
   generate_secret = false
-  
+
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
@@ -49,16 +91,83 @@ resource "aws_api_gateway_resource" "upload" {
   path_part   = "upload"
 }
 
-resource "aws_api_gateway_method" "upload_post" {
-  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
-  resource_id   = aws_api_gateway_resource.upload.id
-  http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+# Add request model for validation
+resource "aws_api_gateway_model" "request_model" {
+  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
+  name         = "ImageUploadModel"
+  description  = "Image upload request validation model"
+  content_type = "application/json"
 
-  request_parameters = {
-    "method.request.header.Authorization" = true
+  schema = jsonencode({
+    type     = "object"
+    required = ["image"]
+    properties = {
+      image = {
+        type = "string"
+      }
+    }
+  })
+}
+
+# Modify the stage to include logging and X-Ray tracing
+resource "aws_api_gateway_stage" "api_stage" {
+  deployment_id = aws_api_gateway_deployment.api_deployment.id
+  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
+
+  stage_name = var.stage_name
+
+  xray_tracing_enabled = true
+
+  # Enable logging
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_logs.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
   }
+
+  # Enable caching
+  # cache_cluster_enabled = true
+  # cache_cluster_size    = 0.5 # Smallest available size
+
+  client_certificate_id = aws_api_gateway_client_certificate.api_cert.id
+}
+
+# Add client certificate
+resource "aws_api_gateway_client_certificate" "api_cert" {
+  description = "Client certificate for ${var.project_name}-${var.env}"
+}
+
+# Create log group for API Gateway logs
+resource "aws_cloudwatch_log_group" "api_logs" {
+  name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
+  retention_in_days = 365 # Changed from 30 to 365
+  # kms_key_id        = var.kms_key_arn
+}
+
+# Modify deployment to include create before destroy
+resource "aws_api_gateway_deployment" "api_deployment" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.lambda_integration,
+    aws_api_gateway_integration.options_integration,
+    aws_api_gateway_method.upload_post,
+    aws_api_gateway_method.upload_options
+  ]
 }
 
 resource "aws_api_gateway_integration" "lambda_integration" {
@@ -67,16 +176,16 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   http_method = aws_api_gateway_method.upload_post.http_method
 
   integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.lambda_invoke_arn
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arn
 }
 
-# CORS Configuration
 resource "aws_api_gateway_method" "upload_options" {
-  rest_api_id   = aws_api_gateway_rest_api.image_upload.id
-  resource_id   = aws_api_gateway_resource.upload.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
+  rest_api_id          = aws_api_gateway_rest_api.image_upload.id
+  resource_id          = aws_api_gateway_resource.upload.id
+  http_method          = "OPTIONS"
+  authorization        = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.validator.id
 }
 
 resource "aws_api_gateway_integration" "options_integration" {
@@ -87,6 +196,20 @@ resource "aws_api_gateway_integration" "options_integration" {
 
   request_templates = {
     "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_settings" "all" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+  stage_name  = aws_api_gateway_stage.api_stage.stage_name
+  method_path = "*/*"
+
+  settings {
+    logging_level        = "INFO"
+    data_trace_enabled   = false
+    metrics_enabled      = true
+    caching_enabled      = true
+    cache_data_encrypted = true
   }
 }
 
@@ -117,24 +240,6 @@ resource "aws_api_gateway_integration_response" "options_integration_response" {
 }
 
 # Deployment and Stage
-resource "aws_api_gateway_deployment" "api_deployment" {
-  rest_api_id = aws_api_gateway_rest_api.image_upload.id
-
-  depends_on = [
-    aws_api_gateway_integration.lambda_integration,
-    aws_api_gateway_integration.options_integration
-  ]
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "api_stage" {
-  deployment_id = aws_api_gateway_deployment.api_deployment.id
-  rest_api_id  = aws_api_gateway_rest_api.image_upload.id
-  stage_name   = var.stage_name
-}
 
 # Lambda Permission
 resource "aws_lambda_permission" "api_gateway" {
@@ -147,9 +252,38 @@ resource "aws_lambda_permission" "api_gateway" {
 resource "aws_cognito_user" "admin" {
   user_pool_id = aws_cognito_user_pool.main.id
   username     = "admin@example.com"
-  
+
   attributes = {
     email          = "admin@example.com"
     email_verified = true
   }
+}
+
+# Enable CloudWatch logging for API Gateway
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
+}
+
+# IAM role for API Gateway CloudWatch logging
+resource "aws_iam_role" "api_gateway_cloudwatch" {
+  name = "${var.project_name}-${var.env}-api-gateway-cloudwatch"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Attach necessary policy for CloudWatch logging
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
+  role       = aws_iam_role.api_gateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 }

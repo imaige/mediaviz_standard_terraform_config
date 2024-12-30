@@ -42,6 +42,36 @@ variable "tags" {
   default     = {}
 }
 
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for encryption"
+  type        = string
+}
+
+variable "kms_key_id" {
+  description = "ID of the KMS key for encryption"
+  type        = string
+}
+
+# variable "encrypted_env_var" {
+#   description = "Encrypted environment variable value"
+#   type        = string
+# }
+
+variable "signing_profile_version_arn" {
+  description = "ARN of the signing profile version"
+  type        = string
+}
+
+variable "subnet_ids" {
+  description = "List of subnet IDs for Lambda VPC config"
+  type        = list(string)
+}
+
+variable "vpc_id" {
+  description = "ID of the VPC"
+  type        = string
+}
+
 variable "output_bucket_name" {
   type = string
 }

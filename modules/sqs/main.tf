@@ -1,3 +1,5 @@
+# sqs/main.tf
+
 resource "aws_sqs_queue" "image_processing" {
   name = "${var.project_name}-${var.env}-image-processing"
   
@@ -6,16 +8,25 @@ resource "aws_sqs_queue" "image_processing" {
   delay_seconds             = var.delay_seconds
   max_message_size          = var.max_message_size
   
-  # Add redrive policy directly (no need for dynamic block)
+  # Enable encryption
+  sqs_managed_sse_enabled = true
+  
+  # Add redrive policy
   redrive_policy = var.enable_dlq ? jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq[0].arn
     maxReceiveCount     = var.max_receive_count
   }) : null
 
-  tags = var.tags
+  # Enable server-side encryption
+  # kms_master_key_id = var.kms_key_id
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
 }
 
-# Dead Letter Queue (DLQ) - created only if enabled
+# Dead Letter Queue (DLQ)
 resource "aws_sqs_queue" "dlq" {
   count = var.enable_dlq ? 1 : 0
   
@@ -23,7 +34,14 @@ resource "aws_sqs_queue" "dlq" {
   
   message_retention_seconds = var.dlq_retention_period
   
-  tags = var.tags
+  # Enable encryption
+  sqs_managed_sse_enabled = true
+  # kms_master_key_id       = var.kms_key_id
+  
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
 }
 
 # SQS Queue Policy
@@ -38,7 +56,9 @@ resource "aws_sqs_queue_policy" "image_processing" {
         Principal = {
           Service = "events.amazonaws.com"
         }
-        Action = "sqs:SendMessage"
+        Action = [
+          "sqs:SendMessage"
+        ]
         Resource = aws_sqs_queue.image_processing.arn
         Condition = {
           ArnEquals = {

@@ -23,3 +23,18 @@ variable "stage_name" {
   type        = string
   default     = "v1"
 }
+
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for encryption"
+  type        = string
+}
+
+variable "kms_key_id" {
+  description = "ID of the KMS key for encryption"
+  type        = string
+}
+
+variable "waf_acl_arn" {
+  description = "ID of the WAF ACL to associate with the API Gateway"
+  type        = string
+}
