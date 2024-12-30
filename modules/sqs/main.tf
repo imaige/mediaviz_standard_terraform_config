@@ -18,7 +18,7 @@ resource "aws_sqs_queue" "image_processing" {
   }) : null
 
   # Enable server-side encryption
-  kms_master_key_id = var.kms_key_id
+  # kms_master_key_id = var.kms_key_id
 
   tags = merge(var.tags, {
     Environment = var.env
@@ -36,7 +36,7 @@ resource "aws_sqs_queue" "dlq" {
   
   # Enable encryption
   sqs_managed_sse_enabled = true
-  kms_master_key_id       = var.kms_key_id
+  # kms_master_key_id       = var.kms_key_id
   
   tags = merge(var.tags, {
     Environment = var.env

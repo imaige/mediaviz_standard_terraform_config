@@ -53,10 +53,10 @@ module "lambda" {
   vpc_id                      = module.vpc.vpc_id
   kms_key_arn                 = module.security.kms_key_arn
   kms_key_id                  = module.security.kms_key_id
-  encrypted_env_var           = var.encrypted_env_var
+  # encrypted_env_var           = var.encrypted_env_var
   sqs_queue_arn  = module.sqs.queue_arn
   output_bucket_name = module.s3.processed_bucket_id
-  output_bucket_arn  = module.s3.processed_bucket_arn 
+  output_bucket_arn  = module.s3.processed_bucket_arn
 }
 
 module "api_gateway" {
@@ -68,7 +68,7 @@ module "api_gateway" {
   lambda_function_name = module.lambda.function_name
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
-  waf_acl_id           = module.security.waf_acl_id
+  waf_acl_arn           = module.security.waf_acl_arn
 }
 
 module "eventbridge" {
@@ -79,6 +79,7 @@ module "eventbridge" {
   target_arn   = module.sqs.queue_arn
   kms_key_arn  = module.security.kms_key_arn
   kms_key_id   = module.security.kms_key_id
+  aws_sqs_queue_dlq_arn = module.sqs.dlq_arn
 }
 
 module "sqs" {

@@ -95,22 +95,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
 }
 
 # Add replication configuration (if needed)
-resource "aws_s3_bucket_replication_configuration" "access_logs" {
-  bucket = aws_s3_bucket.access_logs.id
-  role   = aws_iam_role.replication_role.arn
+# resource "aws_s3_bucket_replication_configuration" "access_logs" {
+#   bucket = aws_s3_bucket.access_logs.id
+#   role   = aws_iam_role.replication_role.arn
 
-  rule {
-    id     = "replicate_all"
-    status = "Enabled"
+#   rule {
+#     id     = "replicate_all"
+#     status = "Enabled"
 
-    destination {
-      bucket = aws_s3_bucket.replica.arn
-      encryption_configuration {
-        replica_kms_key_id = var.replica_kms_key_id
-      }
-    }
-  }
-}
+#     destination {
+#       bucket = aws_s3_bucket.replica.arn
+#       encryption_configuration {
+#         replica_kms_key_id = var.replica_kms_key_id
+#       }
+#     }
+#   }
+# }
 
 resource "aws_s3_bucket_logging" "image_upload" {
   bucket = aws_s3_bucket.image_upload.id

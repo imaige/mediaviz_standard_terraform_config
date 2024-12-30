@@ -23,7 +23,7 @@ resource "aws_lambda_function" "image_upload" {
   environment {
     variables = {
       BUCKET_NAME       = var.s3_bucket_name
-      ENCRYPTED_ENV_VAR = var.encrypted_env_var
+      # ENCRYPTED_ENV_VAR = var.encrypted_env_var
     }
   }
   dead_letter_config {
@@ -251,6 +251,30 @@ resource "aws_iam_role_policy" "processor_sqs_policy" {
       }
     ]
   })
+}
+
+resource "aws_iam_role_policy" "lambda_dlq_policy" {
+  name = "${var.project_name}-${var.env}-lambda-dlq-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = aws_sqs_queue.lambda_dlq.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 # SQS trigger for Lambda

@@ -34,7 +34,7 @@ variable "kms_key_id" {
   type        = string
 }
 
-variable "waf_acl_id" {
+variable "waf_acl_arn" {
   description = "ID of the WAF ACL to associate with the API Gateway"
   type        = string
 }

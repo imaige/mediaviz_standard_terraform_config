@@ -31,29 +31,29 @@ resource "aws_cloudwatch_event_target" "sqs" {
 
   # Add dead-letter config
   dead_letter_config {
-    arn = aws_sqs_queue.dlq.arn
+    arn = var.aws_sqs_queue_dlq_arn
   }
 }
 
-# Create DLQ for EventBridge
-resource "aws_sqs_queue" "dlq" {
-  name                       = "${var.project_name}-${var.env}-eventbridge-dlq"
-  delay_seconds             = 0
-  max_message_size          = 262144
-  message_retention_seconds = 1209600 # 14 days
+# # Create DLQ for EventBridge
+# resource "aws_sqs_queue" "dlq" {
+#   name                       = "${var.project_name}-${var.env}-eventbridge-dlq"
+#   delay_seconds             = 0
+#   max_message_size          = 262144
+#   message_retention_seconds = 1209600 # 14 days
   
-  # Enable encryption
-  kms_master_key_id = var.kms_key_id
+#   # Enable encryption
+#   kms_master_key_id = var.kms_key_id
   
-  tags = {
-    Environment = var.env
-    Terraform   = "true"
-  }
-}
+#   tags = {
+#     Environment = var.env
+#     Terraform   = "true"
+#   }
+# }
 
 # CloudWatch Log Group for EventBridge
-resource "aws_cloudwatch_log_group" "api_logs" {
-  name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
-  retention_in_days = 365  # Changed from 30 to 365
-  kms_key_id       = var.kms_key_arn
-}
+# resource "aws_cloudwatch_log_group" "api_eventbridge_logs" {
+#   name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
+#   retention_in_days = 365  # Changed from 30 to 365
+#   # kms_key_id       = var.kms_key_arn
+# }

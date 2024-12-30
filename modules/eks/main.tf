@@ -80,5 +80,5 @@ module "eks" {
 resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.cluster_name}-${var.env}-cluster"
   retention_in_days = 365  # Changed from 30 to 365
-  kms_key_id       = var.kms_key_arn
+  # kms_key_id       = var.kms_key_arn
 }

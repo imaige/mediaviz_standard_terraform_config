@@ -22,3 +22,7 @@ variable "kms_key_id" {
   description = "ID of the KMS key for encryption"
   type        = string
 }
+
+variable "aws_sqs_queue_dlq_arn" {
+  type        = string
+}

@@ -52,10 +52,10 @@ variable "kms_key_id" {
   type        = string
 }
 
-variable "encrypted_env_var" {
-  description = "Encrypted environment variable value"
-  type        = string
-}
+# variable "encrypted_env_var" {
+#   description = "Encrypted environment variable value"
+#   type        = string
+# }
 
 variable "signing_profile_version_arn" {
   description = "ARN of the signing profile version"

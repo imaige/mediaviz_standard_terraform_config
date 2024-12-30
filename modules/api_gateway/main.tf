@@ -13,9 +13,14 @@ resource "aws_api_gateway_rest_api" "image_upload" {
   }
 }
 
-resource "aws_wafregional_web_acl_association" "api_waf" {
+# resource "aws_wafregional_web_acl_association" "api_waf" {
+#   resource_arn = aws_api_gateway_stage.api_stage.arn
+#   web_acl_id   = var.waf_acl_id
+# }
+
+resource "aws_wafv2_web_acl_association" "api_waf" {
   resource_arn = aws_api_gateway_stage.api_stage.arn
-  web_acl_id   = var.waf_acl_id
+  web_acl_arn  = var.waf_acl_arn  # Changed from web_acl_id
 }
 
 # Add request validation
@@ -131,8 +136,8 @@ resource "aws_api_gateway_stage" "api_stage" {
   }
 
   # Enable caching
-  cache_cluster_enabled = true
-  cache_cluster_size    = "0.5" # Smallest available size
+  # cache_cluster_enabled = true
+  # cache_cluster_size    = 0.5 # Smallest available size
 
   client_certificate_id = aws_api_gateway_client_certificate.api_cert.id
 }
@@ -146,7 +151,7 @@ resource "aws_api_gateway_client_certificate" "api_cert" {
 resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
   retention_in_days = 365 # Changed from 30 to 365
-  kms_key_id        = var.kms_key_arn
+  # kms_key_id        = var.kms_key_arn
 }
 
 # Modify deployment to include create before destroy
@@ -252,4 +257,33 @@ resource "aws_cognito_user" "admin" {
     email          = "admin@example.com"
     email_verified = true
   }
+}
+
+# Enable CloudWatch logging for API Gateway
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
+}
+
+# IAM role for API Gateway CloudWatch logging
+resource "aws_iam_role" "api_gateway_cloudwatch" {
+  name = "${var.project_name}-${var.env}-api-gateway-cloudwatch"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Attach necessary policy for CloudWatch logging
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
+  role       = aws_iam_role.api_gateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 }

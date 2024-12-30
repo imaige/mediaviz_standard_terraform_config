@@ -137,16 +137,30 @@ resource "aws_wafv2_web_acl" "api_waf" {
 }
 
 # CloudWatch logging for WAF
+# CloudWatch logging for WAF
 resource "aws_cloudwatch_log_group" "waf_logs" {
-  name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
-  retention_in_days = 365  # Changed from 30 to 365
-  kms_key_id       = var.kms_key_arn
+  name              = "aws-waf-logs-${var.project_name}-${var.env}"  # Changed format
+  retention_in_days = 365
 }
 
-# Enable WAF logging
+# Enable WAF logging with kinesis_firehose_config
 resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
   log_destination_configs = [aws_cloudwatch_log_group.waf_logs.arn]
   resource_arn           = aws_wafv2_web_acl.api_waf.arn
+
+  logging_filter {
+    default_behavior = "KEEP"
+
+    filter {
+      behavior = "KEEP"
+      condition {
+        action_condition {
+          action = "BLOCK"
+        }
+      }
+      requirement = "MEETS_ANY"
+    }
+  }
 }
 
 # Output the WAF ACL ID for use in other modules
