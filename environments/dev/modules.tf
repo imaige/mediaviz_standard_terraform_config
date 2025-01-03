@@ -101,3 +101,25 @@ module "security" {
   kms_key_arn  = module.security.kms_key_arn
   kms_key_id   = module.security.kms_key_id
 }
+
+module "eks_functions" {
+  source              = "./modules/eks_functions"
+  models              = ["model1", "model2", "model3"]
+  prefix              = "myapp"
+  namespace           = "default"
+  replicas            = 3
+  sqs_urls            = [
+    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel1Queue",
+    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel2Queue",
+    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel3Queue"
+  ]
+  sqs_arns            = [
+    "arn:aws:sqs:us-east-2:123456789012:EKSModel1Queue",
+    "arn:aws:sqs:us-east-2:123456789012:EKSModel2Queue",
+    "arn:aws:sqs:us-east-2:123456789012:EKSModel3Queue"
+  ]
+  aws_region          = "us-west-2"
+  image_tags          = ["latest", "latest", "latest"]
+  service_account_name = "eks-service-account"
+}
+
