@@ -26,6 +26,7 @@ def process_message(message_body):
     try:
         task = json.loads(message_body)
         # Example: Perform some task based on the message content
+        # TODO: send link to S3 bucket photo along with other info (project_table_name, photo_id) to EKS deployment/service for processing
         result = f"Processed file {task['file']} from bucket {task['bucket']}"
         logger.info(f"Model processed result: {result}")
         return result
