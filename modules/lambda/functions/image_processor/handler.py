@@ -1,65 +1,70 @@
-import json
 import boto3
+import json
+import time
+import logging
 import os
-from PIL import Image
-import io
 
-s3_client = boto3.client('s3')
-SOURCE_BUCKET = os.environ['SOURCE_BUCKET']
-OUTPUT_BUCKET = os.environ['OUTPUT_BUCKET']
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def handle_processing(event, context):
-    for record in event['Records']:
-        # Parse SQS message
-        body = json.loads(record['body'])
-        detail = json.loads(body.get('detail', '{}'))
-        
+# Environment variables
+QUEUE_URL = os.getenv("SQS_QUEUE_URL")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
+# Initialize AWS clients
+sqs = boto3.client("sqs", region_name=AWS_REGION)
+
+def process_message(message_body):
+    """
+    Simulate model processing for the given task.
+    Replace this with your actual model logic.
+    """
+    logger.info(f"Received task: {message_body}")
+    
+    # Simulated model processing
+    try:
+        task = json.loads(message_body)
+        # Example: Perform some task based on the message content
+        result = f"Processed file {task['file']} from bucket {task['bucket']}"
+        logger.info(f"Model processed result: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+        raise
+
+def poll_sqs_queue():
+    """
+    Poll the SQS queue for new messages and process them.
+    """
+    while True:
         try:
-            # Get image details from event
-            source_key = detail.get('key')
-            client_id = detail.get('client_id')
-            
-            if not source_key or not client_id:
-                print(f"Missing required fields in event: {detail}")
-                continue
-                
-            # Download image from S3
-            response = s3_client.get_object(
-                Bucket=SOURCE_BUCKET,
-                Key=source_key
+            # Receive messages from the queue
+            response = sqs.receive_message(
+                QueueUrl=QUEUE_URL,
+                MaxNumberOfMessages=1,
+                WaitTimeSeconds=10,  # Long-polling
             )
-            image_content = response['Body'].read()
-            
-            # Process image with PIL
-            with Image.open(io.BytesIO(image_content)) as img:
-                # Example: Create thumbnail
-                img.thumbnail((300, 300))
-                
-                # Save processed image
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG')
-                buffer.seek(0)
-                
-                # Generate output key
-                filename = source_key.split('/')[-1]
-                output_key = f"processed/{client_id}/{filename}"
-                
-                # Upload processed image
-                s3_client.put_object(
-                    Bucket=OUTPUT_BUCKET,
-                    Key=output_key,
-                    Body=buffer,
-                    ContentType='image/jpeg',
-                    Metadata={
-                        'client_id': client_id,
-                        'source_image': source_key,
-                        'processed': 'true'
-                    }
-                )
-                
-                print(f"Successfully processed image: {source_key} -> {output_key}")
-                
+
+            if "Messages" in response:
+                for message in response["Messages"]:
+                    receipt_handle = message["ReceiptHandle"]
+                    message_body = message["Body"]
+
+                    # Process the message
+                    process_message(message_body)
+
+                    # Delete the message from the queue
+                    sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=receipt_handle)
+                    logger.info(f"Message deleted from queue: {receipt_handle}")
+            else:
+                logger.info("No messages in the queue. Waiting...")
+                time.sleep(5)
+
         except Exception as e:
-            print(f"Error processing message: {str(e)}")
-            # The message will be moved to DLQ if max retries exceeded
-            raise
+            logger.error(f"Error polling the SQS queue: {e}")
+            time.sleep(10)  # Backoff on errors
+
+if __name__ == "__main__":
+    logger.info("Starting SQS listener...")
+    poll_sqs_queue()

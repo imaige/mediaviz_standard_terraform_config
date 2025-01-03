@@ -69,3 +69,42 @@ resource "aws_sqs_queue_policy" "image_processing" {
     ]
   })
 }
+
+resource "aws_sqs_queue" "eks_model1_queue" {
+  name = "EKSModel1Queue"
+}
+
+resource "aws_sqs_queue" "eks_model2_queue" {
+  name = "EKSModel2Queue"
+}
+
+resource "aws_sqs_queue" "eks_model3_queue" {
+  name = "EKSModel3Queue"
+}
+
+resource "aws_sqs_queue" "lambda_model1_queue" {
+  name = "LambdaModel1Queue"
+}
+
+resource "aws_sqs_queue" "lambda_model2_queue" {
+  name = "LambdaModel2Queue"
+}
+
+resource "aws_sqs_queue" "lambda_model3_queue" {
+  name = "LambdaModel3Queue"
+}
+
+resource "aws_lambda_event_source_mapping" "lambda_model1_trigger" {
+  event_source_arn = aws_sqs_queue.lambda_model1_queue.arn
+  function_name    = aws_lambda_function.lambda_model1.function_name
+}
+
+resource "aws_lambda_event_source_mapping" "lambda_model2_trigger" {
+  event_source_arn = aws_sqs_queue.lambda_model2_queue.arn
+  function_name    = aws_lambda_function.lambda_model2.function_name
+}
+
+resource "aws_lambda_event_source_mapping" "lambda_model3_trigger" {
+  event_source_arn = aws_sqs_queue.lambda_model3_queue.arn
+  function_name    = aws_lambda_function.lambda_model3.function_name
+}

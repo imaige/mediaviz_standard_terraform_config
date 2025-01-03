@@ -57,3 +57,55 @@ resource "aws_cloudwatch_event_target" "sqs" {
 #   retention_in_days = 365  # Changed from 30 to 365
 #   # kms_key_id       = var.kms_key_arn
 # }
+
+resource "aws_cloudwatch_event_rule" "file_upload_rule" {
+  name = "FileUploadRule"
+
+  event_pattern = <<EOF
+{
+  "source": ["custom.myapp"],
+  "detail-type": ["FileUploaded"],
+  "detail": {
+    "bucketName": ["my-s3-bucket"]
+  }
+}
+EOF
+}
+
+# Targets for SQS Queues (EKS Models)
+resource "aws_cloudwatch_event_target" "eks_model1_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-eks-model1"
+  arn       = aws_sqs_queue.eks_model1_queue.arn
+}
+
+resource "aws_cloudwatch_event_target" "eks_model2_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-eks-model2"
+  arn       = aws_sqs_queue.eks_model2_queue.arn
+}
+
+resource "aws_cloudwatch_event_target" "eks_model3_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-eks-model3"
+  arn       = aws_sqs_queue.eks_model3_queue.arn
+}
+
+# Targets for SQS Queues (Lambda Models)
+resource "aws_cloudwatch_event_target" "lambda_model1_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-lambda-model1"
+  arn       = aws_sqs_queue.lambda_model1_queue.arn
+}
+
+resource "aws_cloudwatch_event_target" "lambda_model2_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-lambda-model2"
+  arn       = aws_sqs_queue.lambda_model2_queue.arn
+}
+
+resource "aws_cloudwatch_event_target" "lambda_model3_target" {
+  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
+  target_id = "trigger-lambda-model3"
+  arn       = aws_sqs_queue.lambda_model3_queue.arn
+}
