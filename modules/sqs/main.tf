@@ -1,24 +1,30 @@
 # sqs/main.tf
 
+# Main queue
 resource "aws_sqs_queue" "image_processing" {
   name = "${var.project_name}-${var.env}-image-processing"
   
+  # Message settings
   visibility_timeout_seconds = var.visibility_timeout
-  message_retention_seconds  = var.retention_period
+  message_retention_seconds  = var.retention_period  # 4 days default
   delay_seconds             = var.delay_seconds
-  max_message_size          = var.max_message_size
+  max_message_size          = var.max_message_size  # in bytes
+  receive_wait_time_seconds = 20  # Enable long polling
   
-  # Enable encryption
+  # Encryption
   sqs_managed_sse_enabled = true
+  # kms_master_key_id = var.kms_key_id  # Uncomment if using custom KMS key
   
-  # Add redrive policy
+  # DLQ configuration
   redrive_policy = var.enable_dlq ? jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq[0].arn
     maxReceiveCount     = var.max_receive_count
   }) : null
 
-  # Enable server-side encryption
-  # kms_master_key_id = var.kms_key_id
+  # Prevent deletion in production
+  fifo_queue           = false  # Standard queue
+  deduplication_scope  = null   # Only for FIFO queues
+  fifo_throughput_limit = null  # Only for FIFO queues
 
   tags = merge(var.tags, {
     Environment = var.env
@@ -32,11 +38,12 @@ resource "aws_sqs_queue" "dlq" {
   
   name = "${var.project_name}-${var.env}-image-processing-dlq"
   
-  message_retention_seconds = var.dlq_retention_period
+  message_retention_seconds = var.dlq_retention_period  # Longer retention for failed messages
+  receive_wait_time_seconds = 20  # Enable long polling
   
-  # Enable encryption
+  # Encryption
   sqs_managed_sse_enabled = true
-  # kms_master_key_id       = var.kms_key_id
+  # kms_master_key_id     = var.kms_key_id  # Uncomment if using custom KMS key
   
   tags = merge(var.tags, {
     Environment = var.env
@@ -44,7 +51,8 @@ resource "aws_sqs_queue" "dlq" {
   })
 }
 
-# SQS Queue Policy
+# Queue policy with comprehensive permissions
+
 resource "aws_sqs_queue_policy" "image_processing" {
   queue_url = aws_sqs_queue.image_processing.url
 
@@ -52,17 +60,44 @@ resource "aws_sqs_queue_policy" "image_processing" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid = "AllowSourceServices"
         Effect = "Allow"
         Principal = {
-          Service = "events.amazonaws.com"
+          Service = ["events.amazonaws.com", "lambda.amazonaws.com"]
         }
         Action = [
           "sqs:SendMessage"
         ]
         Resource = aws_sqs_queue.image_processing.arn
         Condition = {
-          ArnEquals = {
-            "aws:SourceArn": var.eventbridge_rule_arn
+          ArnLike = {
+            "aws:SourceArn": var.source_arns
+          }
+        }
+      },
+      {
+        Sid = "LambdaProcessingAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = var.lambda_role_arns
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = aws_sqs_queue.image_processing.arn
+      },
+      {
+        Sid = "DenyNonSSLAccess"
+        Effect = "Deny"
+        Principal = "*"
+        Action = "*"
+        Resource = aws_sqs_queue.image_processing.arn
+        Condition = {
+          Bool = {
+            "aws:SecureTransport": "false"
           }
         }
       }
@@ -70,41 +105,55 @@ resource "aws_sqs_queue_policy" "image_processing" {
   })
 }
 
-resource "aws_sqs_queue" "eks_model1_queue" {
-  name = "EKSModel1Queue"
-}
+# DLQ policy
+resource "aws_sqs_queue_policy" "dlq" {
+  count = var.enable_dlq ? 1 : 0
+  
+  queue_url = aws_sqs_queue.dlq[0].url
 
-resource "aws_sqs_queue" "eks_model2_queue" {
-  name = "EKSModel2Queue"
-}
-
-resource "aws_sqs_queue" "eks_model3_queue" {
-  name = "EKSModel3Queue"
-}
-
-resource "aws_sqs_queue" "lambda_model1_queue" {
-  name = "LambdaModel1Queue"
-}
-
-resource "aws_sqs_queue" "lambda_model2_queue" {
-  name = "LambdaModel2Queue"
-}
-
-resource "aws_sqs_queue" "lambda_model3_queue" {
-  name = "LambdaModel3Queue"
-}
-
-resource "aws_lambda_event_source_mapping" "lambda_model1_trigger" {
-  event_source_arn = aws_sqs_queue.lambda_model1_queue.arn
-  function_name    = aws_lambda_function.lambda_model1.function_name
-}
-
-resource "aws_lambda_event_source_mapping" "lambda_model2_trigger" {
-  event_source_arn = aws_sqs_queue.lambda_model2_queue.arn
-  function_name    = aws_lambda_function.lambda_model2.function_name
-}
-
-resource "aws_lambda_event_source_mapping" "lambda_model3_trigger" {
-  event_source_arn = aws_sqs_queue.lambda_model3_queue.arn
-  function_name    = aws_lambda_function.lambda_model3.function_name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid = "AllowMainQueueDLQ"
+        Effect = "Allow"
+        Principal = "*"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.dlq[0].arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn": aws_sqs_queue.image_processing.arn
+          }
+        }
+      },
+      {
+        Sid = "LambdaDLQAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = var.lambda_role_arns
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = aws_sqs_queue.dlq[0].arn
+      },
+      {
+        Sid = "DenyNonSSLAccess"
+        Effect = "Deny"
+        Principal = "*"
+        Action = "*"
+        Resource = aws_sqs_queue.dlq[0].arn
+        Condition = {
+          Bool = {
+            "aws:SecureTransport": "false"
+          }
+        }
+      }
+    ]
+  })
 }

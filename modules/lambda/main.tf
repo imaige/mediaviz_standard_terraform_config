@@ -43,7 +43,6 @@ resource "aws_lambda_function" "image_upload" {
     Environment = var.env
     Terraform   = "true"
   })
-
 }
 
 # Create function URL configuration as a separate resource
@@ -159,100 +158,6 @@ resource "aws_iam_role_policy" "lambda_eventbridge_policy" {
   })
 }
 
-data "archive_file" "processor_package" {
-  type        = "zip"
-  source_dir  = "${path.module}/functions/image_processor"
-  output_path = "${path.module}/dist/image_processor.zip"
-}
-
-resource "aws_lambda_function" "image_processor" {
-  filename         = data.archive_file.processor_package.output_path
-  function_name    = "${var.project_name}-${var.env}-image-processor"
-  role            = aws_iam_role.processor_role.arn
-  handler         = "handler.handle_processing"
-  runtime         = var.lambda_runtime
-  memory_size     = var.memory_size
-  timeout         = var.timeout
-
-  environment {
-    variables = {
-      OUTPUT_BUCKET = var.output_bucket_name
-      SOURCE_BUCKET = var.s3_bucket_name
-    }
-  }
-
-  tags = var.tags
-}
-
-# IAM role for Processor Lambda
-resource "aws_iam_role" "processor_role" {
-  name = "${var.project_name}-${var.env}-image-processor-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# IAM policy for S3 access (both read and write)
-resource "aws_iam_role_policy" "processor_s3_policy" {
-  name = "${var.project_name}-${var.env}-image-processor-s3-policy"
-  role = aws_iam_role.processor_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:PutObjectAcl"
-        ]
-        Resource = [
-          "${var.s3_bucket_arn}/*",
-          "${var.output_bucket_arn}/*"
-        ]
-      }
-    ]
-  })
-}
-
-# CloudWatch Logs policy
-resource "aws_iam_role_policy_attachment" "processor_logs" {
-  role       = aws_iam_role.processor_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-# SQS policy
-resource "aws_iam_role_policy" "processor_sqs_policy" {
-  name = "${var.project_name}-${var.env}-image-processor-sqs-policy"
-  role = aws_iam_role.processor_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
-        ]
-        Resource = var.sqs_queue_arn
-      }
-    ]
-  })
-}
-
 resource "aws_iam_role_policy" "lambda_dlq_policy" {
   name = "${var.project_name}-${var.env}-lambda-dlq-policy"
   role = aws_iam_role.lambda_role.id
@@ -277,9 +182,190 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-# SQS trigger for Lambda
+# Lambda Module main.tf
+
+locals {
+  lambda_functions = ["module1", "module2", "module3"]
+}
+
+# Create Lambda functions
+resource "aws_lambda_function" "processor" {
+  for_each = toset(local.lambda_functions)
+
+  filename         = data.archive_file.lambda_package[each.key].output_path
+  function_name    = "${var.project_name}-${var.env}-${each.key}-processor"
+  role            = aws_iam_role.lambda_role[each.key].arn
+  handler         = "handler.handle_processing"
+  runtime         = var.lambda_runtime
+  memory_size     = var.memory_size
+  timeout         = var.timeout
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [aws_security_group.lambda_sg[each.key].id]
+  }
+
+  environment {
+    variables = {
+      ENVIRONMENT = var.env
+      DB_SECRET_ARN = var.aurora_secret_arn
+      DB_CLUSTER_ARN = var.aurora_cluster_arn
+      DB_NAME = var.aurora_database_name
+    }
+  }
+
+  dead_letter_config {
+    target_arn = var.dlq_arn
+  }
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Module      = each.key
+    Terraform   = "true"
+  })
+}
+
+# Lambda deployment packages
+data "archive_file" "lambda_package" {
+  for_each = toset(local.lambda_functions)
+
+  type        = "zip"
+  source_dir  = "${path.module}/functions/${each.key}"
+  output_path = "${path.module}/dist/${each.key}.zip"
+}
+
+# IAM roles for Lambda functions
+resource "aws_iam_role" "lambda_role" {
+  for_each = toset(local.lambda_functions)
+
+  name = "${var.project_name}-${var.env}-${each.key}-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# Security Groups for Lambda functions
+resource "aws_security_group" "lambda_sg" {
+  for_each = toset(local.lambda_functions)
+
+  name        = "${var.project_name}-${var.env}-${each.key}-sg"
+  description = "Security group for ${each.key} Lambda function"
+  vpc_id      = var.vpc_id
+
+  # Allow outbound HTTPS
+  egress {
+    description = "HTTPS outbound"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow Aurora access
+  egress {
+    description = "Aurora access"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [var.aurora_security_group_id]
+  }
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Module      = each.key
+    Terraform   = "true"
+  })
+}
+
+# Basic Lambda execution policy
+resource "aws_iam_role_policy_attachment" "basic_execution" {
+  for_each = toset(local.lambda_functions)
+
+  role       = aws_iam_role.lambda_role[each.key].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# VPC access policy
+resource "aws_iam_role_policy_attachment" "vpc_access" {
+  for_each = toset(local.lambda_functions)
+
+  role       = aws_iam_role.lambda_role[each.key].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# SQS processing policy
+resource "aws_iam_role_policy" "sqs_policy" {
+  for_each = toset(local.lambda_functions)
+
+  name = "${var.project_name}-${var.env}-${each.key}-sqs-policy"
+  role = aws_iam_role.lambda_role[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = var.sqs_queue_arn
+      }
+    ]
+  })
+}
+
+# Aurora access policy
+resource "aws_iam_role_policy" "aurora_policy" {
+  for_each = toset(local.lambda_functions)
+
+  name = "${var.project_name}-${var.env}-${each.key}-aurora-policy"
+  role = aws_iam_role.lambda_role[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:CommitTransaction",
+          "rds-data:RollbackTransaction"
+        ]
+        Resource = var.aurora_cluster_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = var.aurora_secret_arn
+      }
+    ]
+  })
+}
+
+# SQS triggers for Lambda functions
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  for_each = toset(local.lambda_functions)
+
   event_source_arn = var.sqs_queue_arn
-  function_name    = aws_lambda_function.image_processor.arn
+  function_name    = aws_lambda_function.processor[each.key].arn
   batch_size       = 1
+  maximum_batching_window_in_seconds = 0
 }
