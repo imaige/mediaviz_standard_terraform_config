@@ -10,9 +10,9 @@ variable "env" {
   description = "Environment name"
 }
 
-variable "sqs_queue_arn" {
-  type        = string
-  description = "ARN of the SQS queue to send events to"
+variable "sqs_queues" {
+  type        = map(string)
+  description = "Map of module names to their SQS queue ARNs"
 }
 
 variable "dlq_arn" {

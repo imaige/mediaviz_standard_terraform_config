@@ -1,5 +1,16 @@
 # eventbridge/main.tf
 
+locals {
+  processors = {
+    lambda-module1 = "LambdaModule1Processing"
+    lambda-module2 = "LambdaModule2Processing"
+    lambda-module3 = "LambdaModule3Processing"
+    eks-module1    = "EKSModule1Processing"
+    eks-module2    = "EKSModule2Processing"
+    eks-module3    = "EKSModule3Processing"
+  }
+}
+
 # Image Upload Rule
 resource "aws_cloudwatch_event_rule" "image_upload" {
   name        = "${var.project_name}-${var.env}-image-upload"
@@ -19,90 +30,55 @@ resource "aws_cloudwatch_event_rule" "image_upload" {
   })
 }
 
-# Module1 Processing Rule
-resource "aws_cloudwatch_event_rule" "module1_processing" {
-  name        = "${var.project_name}-${var.env}-module1-processing"
-  description = "Trigger module1 processing via SQS"
+# Processing Rules for all modules
+resource "aws_cloudwatch_event_rule" "processing_rules" {
+  for_each = local.processors
+
+  name        = "${var.project_name}-${var.env}-${each.key}-processing"
+  description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
     source      = ["custom.imageUpload"]
-    detail-type = ["Module1Processing"]
+    detail-type = [each.value]
     detail = {
       version        = ["1.0"]
-      processingType = ["module1"]
+      processingType = [each.key]
     }
   })
 
   tags = merge(var.tags, {
     Environment = var.env
+    Module      = each.key
+    Type        = can(regex("^lambda-", each.key)) ? "lambda" : "eks"
     Terraform   = "true"
   })
 }
 
-# Module2 Processing Rule
-resource "aws_cloudwatch_event_rule" "module2_processing" {
-  name        = "${var.project_name}-${var.env}-module2-processing"
-  description = "Trigger module2 processing via SQS"
+# SQS Targets for each module
+resource "aws_cloudwatch_event_target" "processor_targets" {
+  for_each = local.processors
 
-  event_pattern = jsonencode({
-    source      = ["custom.imageUpload"]
-    detail-type = ["Module2Processing"]
-    detail = {
-      version        = ["1.0"]
-      processingType = ["module2"]
-    }
-  })
-
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
-  })
-}
-
-# Module3 Processing Rule
-resource "aws_cloudwatch_event_rule" "module3_processing" {
-  name        = "${var.project_name}-${var.env}-module3-processing"
-  description = "Trigger module3 processing via SQS"
-
-  event_pattern = jsonencode({
-    source      = ["custom.imageUpload"]
-    detail-type = ["Module3Processing"]
-    detail = {
-      version        = ["1.0"]
-      processingType = ["module3"]
-    }
-  })
-
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
-  })
-}
-
-# SQS Targets for each rule
-resource "aws_cloudwatch_event_target" "sqs_targets" {
-  for_each = {
-    module1 = aws_cloudwatch_event_rule.module1_processing.name
-    module2 = aws_cloudwatch_event_rule.module2_processing.name
-    module3 = aws_cloudwatch_event_rule.module3_processing.name
-  }
-
-  rule      = each.value
+  rule      = aws_cloudwatch_event_rule.processing_rules[each.key].name
   target_id = "${each.key}ProcessingQueue"
-  arn       = var.sqs_queue_arn
+  arn       = var.sqs_queues[each.key]
 
   # Transform the input to add module-specific information
   input_transformer {
     input_paths = {
-      client_id = "$.detail.client_id",
-      file_id   = "$.detail.file_id",
+      client_id = "$.detail.client_id"
+      file_id   = "$.detail.file_id"
       timestamp = "$.time"
+      bucket    = "$.detail.bucket"
+      key       = "$.detail.key"
     }
     input_template = <<EOF
 {
   "client_id": "<client_id>",
   "file_id": "<file_id>",
+  "bucket": "<bucket>",
+  "key": "<key>",
   "module": "${each.key}",
+  "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",
   "timestamp": "<timestamp>"
 }
 EOF
@@ -120,11 +96,35 @@ EOF
   }
 }
 
-# Original image upload target
-resource "aws_cloudwatch_event_target" "sqs" {
+# Fan-out target from main upload event
+resource "aws_cloudwatch_event_target" "fanout_targets" {
+  for_each = local.processors
+
   rule      = aws_cloudwatch_event_rule.image_upload.name
-  target_id = "ProcessImageQueue"
-  arn       = var.sqs_queue_arn
+  target_id = "${each.key}InitialTarget"
+  arn       = var.sqs_queues[each.key]
+
+  # Transform the input to add module-specific information
+  input_transformer {
+    input_paths = {
+      client_id = "$.detail.client_id"
+      file_id   = "$.detail.file_id"
+      timestamp = "$.time"
+      bucket    = "$.detail.bucket"
+      key       = "$.detail.key"
+    }
+    input_template = <<EOF
+{
+  "client_id": "<client_id>",
+  "file_id": "<file_id>",
+  "bucket": "<bucket>",
+  "key": "<key>",
+  "module": "${each.key}",
+  "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",
+  "timestamp": "<timestamp>"
+}
+EOF
+  }
 
   # Add retry policy
   retry_policy {

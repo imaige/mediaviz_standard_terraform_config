@@ -1,30 +1,27 @@
 # sqs/main.tf
 
+locals {
+  lambda_modules = ["lambda-module1", "lambda-module2", "lambda-module3"]
+  eks_modules    = ["eks-module1", "eks-module2", "eks-module3"]
+  all_modules    = concat(local.lambda_modules, local.eks_modules)
+}
+
 # Main queue
 resource "aws_sqs_queue" "image_processing" {
   name = "${var.project_name}-${var.env}-image-processing"
   
-  # Message settings
   visibility_timeout_seconds = var.visibility_timeout
-  message_retention_seconds  = var.retention_period  # 4 days default
+  message_retention_seconds  = var.retention_period
   delay_seconds             = var.delay_seconds
-  max_message_size          = var.max_message_size  # in bytes
-  receive_wait_time_seconds = 20  # Enable long polling
+  max_message_size          = var.max_message_size
+  receive_wait_time_seconds = 20
   
-  # Encryption
   sqs_managed_sse_enabled = true
-  # kms_master_key_id = var.kms_key_id  # Uncomment if using custom KMS key
   
-  # DLQ configuration
   redrive_policy = var.enable_dlq ? jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.dlq[0].arn
+    deadLetterTargetArn = aws_sqs_queue.image_processing_dlq[0].arn
     maxReceiveCount     = var.max_receive_count
   }) : null
-
-  # Prevent deletion in production
-  fifo_queue           = false  # Standard queue
-  deduplication_scope  = null   # Only for FIFO queues
-  fifo_throughput_limit = null  # Only for FIFO queues
 
   tags = merge(var.tags, {
     Environment = var.env
@@ -32,27 +29,71 @@ resource "aws_sqs_queue" "image_processing" {
   })
 }
 
-# Dead Letter Queue (DLQ)
-resource "aws_sqs_queue" "dlq" {
+# Main DLQ
+resource "aws_sqs_queue" "image_processing_dlq" {
   count = var.enable_dlq ? 1 : 0
   
   name = "${var.project_name}-${var.env}-image-processing-dlq"
   
-  message_retention_seconds = var.dlq_retention_period  # Longer retention for failed messages
-  receive_wait_time_seconds = 20  # Enable long polling
+  message_retention_seconds = var.dlq_retention_period
+  receive_wait_time_seconds = 20
   
-  # Encryption
   sqs_managed_sse_enabled = true
-  # kms_master_key_id     = var.kms_key_id  # Uncomment if using custom KMS key
   
   tags = merge(var.tags, {
     Environment = var.env
+    Type        = "DLQ"
     Terraform   = "true"
   })
 }
 
-# Queue policy with comprehensive permissions
+# Processing queues for all modules
+resource "aws_sqs_queue" "module_queues" {
+  for_each = toset(local.all_modules)
 
+  name = "${var.project_name}-${var.env}-${each.key}-queue"
+  
+  visibility_timeout_seconds = try(var.module_specific_config[each.key].visibility_timeout, var.visibility_timeout)
+  message_retention_seconds  = var.retention_period
+  delay_seconds             = try(var.module_specific_config[each.key].delay_seconds, var.delay_seconds)
+  max_message_size          = var.max_message_size
+  receive_wait_time_seconds = 20
+  
+  sqs_managed_sse_enabled = true
+  
+  redrive_policy = var.enable_dlq ? jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.module_dlqs[each.key].arn
+    maxReceiveCount     = try(var.module_specific_config[each.key].max_receive_count, var.max_receive_count)
+  }) : null
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Module      = each.key
+    Type        = can(regex("^lambda-", each.key)) ? "lambda" : "eks"
+    Terraform   = "true"
+  })
+}
+
+# Module DLQs
+resource "aws_sqs_queue" "module_dlqs" {
+  for_each = var.enable_dlq ? toset(local.all_modules) : []
+  
+  name = "${var.project_name}-${var.env}-${each.key}-dlq"
+  
+  message_retention_seconds = var.dlq_retention_period
+  receive_wait_time_seconds = 20
+  
+  sqs_managed_sse_enabled = true
+  
+  tags = merge(var.tags, {
+    Environment = var.env
+    Module      = each.key
+    Type        = "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}-dlq"
+    Terraform   = "true"
+  })
+}
+
+# Queue Policies
 resource "aws_sqs_queue_policy" "image_processing" {
   queue_url = aws_sqs_queue.image_processing.url
 
@@ -65,29 +106,13 @@ resource "aws_sqs_queue_policy" "image_processing" {
         Principal = {
           Service = ["events.amazonaws.com", "lambda.amazonaws.com"]
         }
-        Action = [
-          "sqs:SendMessage"
-        ]
+        Action = ["sqs:SendMessage"]
         Resource = aws_sqs_queue.image_processing.arn
         Condition = {
           ArnLike = {
             "aws:SourceArn": var.source_arns
           }
         }
-      },
-      {
-        Sid = "LambdaProcessingAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = var.lambda_role_arns
-        }
-        Action = [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "sqs:ChangeMessageVisibility"
-        ]
-        Resource = aws_sqs_queue.image_processing.arn
       },
       {
         Sid = "DenyNonSSLAccess"
@@ -105,34 +130,34 @@ resource "aws_sqs_queue_policy" "image_processing" {
   })
 }
 
-# DLQ policy
-resource "aws_sqs_queue_policy" "dlq" {
-  count = var.enable_dlq ? 1 : 0
-  
-  queue_url = aws_sqs_queue.dlq[0].url
+# Module queue policies
+resource "aws_sqs_queue_policy" "module_queues" {
+  for_each = toset(local.all_modules)
+
+  queue_url = aws_sqs_queue.module_queues[each.key].url
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "AllowMainQueueDLQ"
+        Sid = "AllowEventBridge"
         Effect = "Allow"
-        Principal = "*"
-        Action = [
-          "sqs:SendMessage"
-        ]
-        Resource = aws_sqs_queue.dlq[0].arn
+        Principal = {
+          Service = "events.amazonaws.com"
+        }
+        Action = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.module_queues[each.key].arn
         Condition = {
-          ArnEquals = {
-            "aws:SourceArn": aws_sqs_queue.image_processing.arn
+          ArnLike = {
+            "aws:SourceArn": var.source_arns
           }
         }
       },
       {
-        Sid = "LambdaDLQAccess"
+        Sid = "AllowProcessorAccess"
         Effect = "Allow"
         Principal = {
-          AWS = var.lambda_role_arns
+          AWS = can(regex("^lambda-", each.key)) ? var.lambda_role_arns : [var.eks_role_arn]
         }
         Action = [
           "sqs:ReceiveMessage",
@@ -140,14 +165,14 @@ resource "aws_sqs_queue_policy" "dlq" {
           "sqs:GetQueueAttributes",
           "sqs:ChangeMessageVisibility"
         ]
-        Resource = aws_sqs_queue.dlq[0].arn
+        Resource = aws_sqs_queue.module_queues[each.key].arn
       },
       {
         Sid = "DenyNonSSLAccess"
         Effect = "Deny"
         Principal = "*"
         Action = "*"
-        Resource = aws_sqs_queue.dlq[0].arn
+        Resource = aws_sqs_queue.module_queues[each.key].arn
         Condition = {
           Bool = {
             "aws:SecureTransport": "false"

@@ -93,35 +93,58 @@ module "api_gateway" {
 module "eventbridge" {
   source = "./../../modules/eventbridge"
   
-  project_name  = var.project_name
-  env          = var.env
-  sqs_queue_arn = module.sqs.queue_arn
-  dlq_arn      = module.sqs.dlq_arn
+  project_name = var.project_name
+  env         = var.env
   
-  tags = var.tags
+  sqs_queues = {
+    lambda-module1 = module.sqs.lambda_queue_arns["module1"]
+    lambda-module2 = module.sqs.lambda_queue_arns["module2"]
+    lambda-module3 = module.sqs.lambda_queue_arns["module3"]
+    eks-module1    = module.sqs.eks_queue_arns["module1"]
+    eks-module2    = module.sqs.eks_queue_arns["module2"]
+    eks-module3    = module.sqs.eks_queue_arns["module3"]
+  }
+  
+  dlq_arn = module.sqs.dlq_arn
+  tags    = var.tags
 }
 
 module "sqs" {
   source = "./../../modules/sqs"
 
   project_name = var.project_name
-  env          = var.env
-
-  visibility_timeout = 180 # Match your Lambda timeout
-  max_receive_count  = 3
-  enable_dlq         = true
-
+  env         = var.env
+  
+  # Base configuration
+  visibility_timeout = 300  # 5 minutes
+  enable_dlq        = true
+  max_receive_count = 3
+  
+  # Source ARNs
   source_arns = concat(
-    module.eventbridge.all_rule_arns,
-    [module.lambda_upload.function_arn]
+    [module.lambda_upload.function_arn],
+    module.eventbridge.event_bus_rule_arns
   )
-
+  
+  # Access permissions
   lambda_role_arns = module.lambda_processors.all_role_arns
+  eks_role_arn = module.eks.eks_managed_node_groups["primary_node_group"].iam_role_arn
 
-  # Optionally override other defaults
-  retention_period     = 172800 # 2 days
-  dlq_retention_period = 604800 # 7 days
-
+  # Optional: Module-specific configurations
+  module_specific_config = {
+    "lambda-module1" = {
+      visibility_timeout = 600  # 10 minutes for longer processing
+      max_receive_count = 5
+    }
+    "eks-module2" = {
+      delay_seconds = 10  # Add delay for this specific module
+    }
+  }
+  
+  # Optional: KMS encryption
+  use_kms_encryption = true
+  kms_key_id         = module.security.kms_key_id
+  
   tags = var.tags
 }
 

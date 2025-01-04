@@ -52,26 +52,51 @@ variable "dlq_retention_period" {
   default     = 1209600  # 14 days
 }
 
-variable "lambda_role_arns" {
+variable "source_arns" {
   type        = list(string)
-  description = "List of Lambda role ARNs that need access to the queue"
+  description = "List of ARNs that can send messages to the queues (EventBridge rules, Lambda functions)"
   default     = []
 }
 
-# variable "kms_key_id" {
-#   type        = string
-#   description = "KMS key ID for queue encryption"
-#   default     = null
-# }
+variable "lambda_role_arns" {
+  type        = list(string)
+  description = "List of Lambda role ARNs that need access to the queues"
+  default     = []
+}
+
+variable "eks_role_arn" {
+  type        = string
+  description = "EKS IAM role ARN that needs access to the queues"
+  default     = null
+}
+
+# Optional KMS configuration
+variable "kms_key_id" {
+  type        = string
+  description = "The ID of an AWS-managed customer master key for Amazon SQS or a custom CMK"
+  default     = null
+}
+
+variable "use_kms_encryption" {
+  type        = bool
+  description = "Whether to use KMS encryption instead of SQS-managed encryption"
+  default     = false
+}
 
 variable "tags" {
   type        = map(string)
-  description = "Additional tags for resources"
+  description = "A map of tags to add to all resources"
   default     = {}
 }
 
-variable "source_arns" {
-  type        = list(string)
-  description = "List of ARNs that can send messages to the queue (EventBridge rules, Lambda functions)"
-  default     = []
+# Module-specific settings
+variable "module_specific_config" {
+  type = map(object({
+    visibility_timeout = optional(number)
+    max_receive_count = optional(number)
+    delay_seconds    = optional(number)
+    policy_statements = optional(list(any))
+  }))
+  description = "Module-specific configurations for each processing queue"
+  default     = {}
 }
