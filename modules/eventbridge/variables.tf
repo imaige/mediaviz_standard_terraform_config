@@ -1,28 +1,27 @@
+# eventbridge/variables.tf
+
 variable "project_name" {
-  description = "Name of the project"
   type        = string
+  description = "Name of the project"
 }
 
 variable "env" {
+  type        = string
   description = "Environment name"
-  type        = string
 }
 
-variable "target_arn" {
-  description = "ARN of the target service (SQS, Lambda, etc)"
+variable "sqs_queue_arn" {
   type        = string
+  description = "ARN of the SQS queue to send events to"
 }
 
-variable "kms_key_arn" {
-  description = "ARN of the KMS key for encryption"
+variable "dlq_arn" {
   type        = string
+  description = "ARN of the Dead Letter Queue"
 }
 
-variable "kms_key_id" {
-  description = "ID of the KMS key for encryption"
-  type        = string
-}
-
-variable "aws_sqs_queue_dlq_arn" {
-  type        = string
+variable "tags" {
+  type        = map(string)
+  description = "Additional tags for resources"
+  default     = {}
 }

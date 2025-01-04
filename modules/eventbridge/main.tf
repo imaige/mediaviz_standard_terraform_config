@@ -1,5 +1,6 @@
 # eventbridge/main.tf
 
+# Image Upload Rule
 resource "aws_cloudwatch_event_rule" "image_upload" {
   name        = "${var.project_name}-${var.env}-image-upload"
   description = "Capture image upload events with client_id"
@@ -12,100 +13,138 @@ resource "aws_cloudwatch_event_rule" "image_upload" {
     }
   })
 
-  tags = {
+  tags = merge(var.tags, {
     Environment = var.env
     Terraform   = "true"
-  }
+  })
 }
 
-resource "aws_cloudwatch_event_target" "sqs" {
-  rule      = aws_cloudwatch_event_rule.image_upload.name
-  target_id = "ProcessImageQueue"
-  arn       = var.target_arn
+# Module1 Processing Rule
+resource "aws_cloudwatch_event_rule" "module1_processing" {
+  name        = "${var.project_name}-${var.env}-module1-processing"
+  description = "Trigger module1 processing via SQS"
+
+  event_pattern = jsonencode({
+    source      = ["custom.imageUpload"]
+    detail-type = ["Module1Processing"]
+    detail = {
+      version        = ["1.0"]
+      processingType = ["module1"]
+    }
+  })
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
+}
+
+# Module2 Processing Rule
+resource "aws_cloudwatch_event_rule" "module2_processing" {
+  name        = "${var.project_name}-${var.env}-module2-processing"
+  description = "Trigger module2 processing via SQS"
+
+  event_pattern = jsonencode({
+    source      = ["custom.imageUpload"]
+    detail-type = ["Module2Processing"]
+    detail = {
+      version        = ["1.0"]
+      processingType = ["module2"]
+    }
+  })
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
+}
+
+# Module3 Processing Rule
+resource "aws_cloudwatch_event_rule" "module3_processing" {
+  name        = "${var.project_name}-${var.env}-module3-processing"
+  description = "Trigger module3 processing via SQS"
+
+  event_pattern = jsonencode({
+    source      = ["custom.imageUpload"]
+    detail-type = ["Module3Processing"]
+    detail = {
+      version        = ["1.0"]
+      processingType = ["module3"]
+    }
+  })
+
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
+}
+
+# SQS Targets for each rule
+resource "aws_cloudwatch_event_target" "sqs_targets" {
+  for_each = {
+    module1 = aws_cloudwatch_event_rule.module1_processing.name
+    module2 = aws_cloudwatch_event_rule.module2_processing.name
+    module3 = aws_cloudwatch_event_rule.module3_processing.name
+  }
+
+  rule      = each.value
+  target_id = "${each.key}ProcessingQueue"
+  arn       = var.sqs_queue_arn
+
+  # Transform the input to add module-specific information
+  input_transformer {
+    input_paths = {
+      client_id = "$.detail.client_id",
+      file_id   = "$.detail.file_id",
+      timestamp = "$.time"
+    }
+    input_template = <<EOF
+{
+  "client_id": "<client_id>",
+  "file_id": "<file_id>",
+  "module": "${each.key}",
+  "timestamp": "<timestamp>"
+}
+EOF
+  }
 
   # Add retry policy
   retry_policy {
-    maximum_event_age_in_seconds = 86400  # 24 hours
+    maximum_event_age_in_seconds = 86400 # 24 hours
     maximum_retry_attempts       = 3
   }
 
   # Add dead-letter config
   dead_letter_config {
-    arn = var.aws_sqs_queue_dlq_arn
+    arn = var.dlq_arn
   }
 }
 
-# # Create DLQ for EventBridge
-# resource "aws_sqs_queue" "dlq" {
-#   name                       = "${var.project_name}-${var.env}-eventbridge-dlq"
-#   delay_seconds             = 0
-#   max_message_size          = 262144
-#   message_retention_seconds = 1209600 # 14 days
-  
-#   # Enable encryption
-#   kms_master_key_id = var.kms_key_id
-  
-#   tags = {
-#     Environment = var.env
-#     Terraform   = "true"
-#   }
-# }
+# Original image upload target
+resource "aws_cloudwatch_event_target" "sqs" {
+  rule      = aws_cloudwatch_event_rule.image_upload.name
+  target_id = "ProcessImageQueue"
+  arn       = var.sqs_queue_arn
 
-# CloudWatch Log Group for EventBridge
-# resource "aws_cloudwatch_log_group" "api_eventbridge_logs" {
-#   name              = "/aws/apigateway/${var.project_name}-${var.env}-upload-api"
-#   retention_in_days = 365  # Changed from 30 to 365
-#   # kms_key_id       = var.kms_key_arn
-# }
+  # Add retry policy
+  retry_policy {
+    maximum_event_age_in_seconds = 86400 # 24 hours
+    maximum_retry_attempts       = 3
+  }
 
-resource "aws_cloudwatch_event_rule" "file_upload_rule" {
-  name = "FileUploadRule"
-
-  event_pattern = <<EOF
-{
-  "source": ["custom.myapp"],
-  "detail-type": ["FileUploaded"],
-  "detail": {
-    "bucketName": ["my-s3-bucket"]
+  # Add dead-letter config
+  dead_letter_config {
+    arn = var.dlq_arn
   }
 }
-EOF
-}
 
-# Targets for SQS Queues (EKS Models)
-resource "aws_cloudwatch_event_target" "eks_model1_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-eks-model1"
-  arn       = aws_sqs_queue.eks_model1_queue.arn
-}
+# CloudWatch Log Group for monitoring
+resource "aws_cloudwatch_log_group" "eventbridge_logs" {
+  name              = "/aws/events/${var.project_name}-${var.env}-processing"
+  retention_in_days = 365
 
-resource "aws_cloudwatch_event_target" "eks_model2_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-eks-model2"
-  arn       = aws_sqs_queue.eks_model2_queue.arn
-}
-
-resource "aws_cloudwatch_event_target" "eks_model3_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-eks-model3"
-  arn       = aws_sqs_queue.eks_model3_queue.arn
-}
-
-# Targets for SQS Queues (Lambda Models)
-resource "aws_cloudwatch_event_target" "lambda_model1_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-lambda-model1"
-  arn       = aws_sqs_queue.lambda_model1_queue.arn
-}
-
-resource "aws_cloudwatch_event_target" "lambda_model2_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-lambda-model2"
-  arn       = aws_sqs_queue.lambda_model2_queue.arn
-}
-
-resource "aws_cloudwatch_event_target" "lambda_model3_target" {
-  rule      = aws_cloudwatch_event_rule.file_upload_rule.name
-  target_id = "trigger-lambda-model3"
-  arn       = aws_sqs_queue.lambda_model3_queue.arn
+  tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
 }
