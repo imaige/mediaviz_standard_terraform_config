@@ -1,4 +1,7 @@
 # eks/outputs.tf
+data "aws_eks_cluster" "this" {
+  name = module.eks.cluster_name
+}
 
 output "cluster_arn" {
   description = "The Amazon Resource Name (ARN) of the cluster"
@@ -46,16 +49,17 @@ output "node_security_group_id" {
   value       = module.eks.node_security_group_id
 }
 
-# IAM Role for node groups
+# # IAM Role for node groups
+# Update these outputs in outputs.tf
 output "eks_managed_node_groups_iam_role_arns" {
   description = "IAM role ARNs of EKS managed node groups"
-  value       = module.eks.eks_managed_node_groups_iam_role_arns
+  value       = { for key, group in module.eks.eks_managed_node_groups : key => group.iam_role_arn }
 }
 
 # Main node IAM role ARN to use for SQS
 output "node_group_role_arn" {
   description = "IAM role ARN for EKS managed node group"
-  value       = module.eks.eks_managed_node_groups["primary_node_group"].iam_role_arn
+  value       = data.aws_eks_cluster.this.role_arn
 }
 
 # OIDC Provider

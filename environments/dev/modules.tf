@@ -97,12 +97,12 @@ module "eventbridge" {
   env         = var.env
   
   sqs_queues = {
-    lambda-module1 = module.sqs.lambda_queue_arns["module1"]
-    lambda-module2 = module.sqs.lambda_queue_arns["module2"]
-    lambda-module3 = module.sqs.lambda_queue_arns["module3"]
-    eks-module1    = module.sqs.eks_queue_arns["module1"]
-    eks-module2    = module.sqs.eks_queue_arns["module2"]
-    eks-module3    = module.sqs.eks_queue_arns["module3"]
+    lambda-module1 = module.sqs.lambda_queue_arns["lambda-module1"]
+    lambda-module2 = module.sqs.lambda_queue_arns["lambda-module2"]
+    lambda-module3 = module.sqs.lambda_queue_arns["lambda-module3"]
+    eks-module1    = module.sqs.eks_queue_arns["eks-module1"]
+    eks-module2    = module.sqs.eks_queue_arns["eks-module2"]
+    eks-module3    = module.sqs.eks_queue_arns["eks-module3"]
   }
   
   dlq_arn = module.sqs.dlq_arn
@@ -128,7 +128,8 @@ module "sqs" {
   
   # Access permissions
   lambda_role_arns = module.lambda_processors.all_role_arns
-  eks_role_arn = module.eks.eks_managed_node_groups["primary_node_group"].iam_role_arn
+  eks_role_arn = module.eks.node_group_role_arn
+
 
   # Optional: Module-specific configurations
   module_specific_config = {
