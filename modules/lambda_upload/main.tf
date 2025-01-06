@@ -1,5 +1,13 @@
 # lambda_upload/main.tf
 
+locals {
+  # Normalize tags to lowercase to prevent case-sensitivity issues
+  normalized_tags = {
+    for key, value in var.tags :
+    lower(key) => value
+  }
+}
+
 data "archive_file" "lambda_package" {
   type        = "zip"
   source_dir  = "${path.module}/functions/image_upload"
@@ -39,9 +47,9 @@ resource "aws_lambda_function" "image_upload" {
 
   reserved_concurrent_executions = 100
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    terraform   = "true"
   })
 }
 
@@ -71,18 +79,16 @@ resource "aws_lambda_function_event_invoke_config" "image_upload" {
   maximum_retry_attempts = 0
 }
 
-# Create a signing profile with a compliant name
 resource "aws_signer_signing_profile" "lambda_signing" {
   name_prefix = replace("${substr(var.project_name, 0, 20)}${var.env}", "-", "")
   platform_id = "AWSLambda-SHA384-ECDSA"
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    terraform   = "true"
   })
 }
 
-# Use the signing profile in code signing config
 resource "aws_lambda_code_signing_config" "signing_config" {
   allowed_publishers {
     signing_profile_version_arns = [aws_signer_signing_profile.lambda_signing.version_arn]
@@ -99,9 +105,9 @@ resource "aws_sqs_queue" "lambda_dlq" {
   name = "${var.project_name}-${var.env}-lambda-dlq"
   kms_master_key_id = var.kms_key_id
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    terraform   = "true"
   })
 }
 
@@ -126,9 +132,9 @@ resource "aws_security_group" "lambda_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    terraform   = "true"
   })
 }
 
@@ -148,9 +154,9 @@ resource "aws_iam_role" "lambda_role" {
     ]
   })
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    terraform   = "true"
   })
 }
 

@@ -2,6 +2,12 @@
 
 locals {
   lambda_functions = ["module1", "module2", "module3"]
+  
+  # Normalize tags to lowercase to prevent case-sensitivity issues
+  normalized_tags = {
+    for key, value in var.tags :
+    lower(key) => value
+  }
 }
 
 data "archive_file" "processor_package" {
@@ -45,10 +51,10 @@ resource "aws_lambda_function" "processor" {
     mode = "Active"
   }
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Module      = each.key
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    module      = each.key
+    terraform   = "true"
   })
 }
 
@@ -75,10 +81,10 @@ resource "aws_security_group" "processor_sg" {
     security_groups = [var.aurora_security_group_id]
   }
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Module      = each.key
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    module      = each.key
+    terraform   = "true"
   })
 }
 
@@ -98,10 +104,10 @@ resource "aws_iam_role" "processor_role" {
     }]
   })
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Module      = each.key
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    environment = var.env
+    module      = each.key
+    terraform   = "true"
   })
 }
 

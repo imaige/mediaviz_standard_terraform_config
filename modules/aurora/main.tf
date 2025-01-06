@@ -132,7 +132,7 @@ resource "aws_rds_cluster" "aurora" {
   preferred_maintenance_window = var.maintenance_window
   
   # Enable Data API
-  enable_http_endpoint = true
+#   enable_http_endpoint = true
 
   # Use custom parameter group
   db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.aurora.name
@@ -175,6 +175,7 @@ resource "aws_rds_cluster_instance" "aurora" {
 }
 
 # IAM role for enhanced monitoring
+# IAM role for enhanced monitoring
 resource "aws_iam_role" "enhanced_monitoring" {
   name = "${var.project_name}-${var.env}-aurora-monitoring"
 
@@ -191,10 +192,10 @@ resource "aws_iam_role" "enhanced_monitoring" {
     ]
   })
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
-  })
+  # Use only the provider-level default tags
+  tags = {
+    Name = "${var.project_name}-${var.env}-aurora-monitoring"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "enhanced_monitoring" {
