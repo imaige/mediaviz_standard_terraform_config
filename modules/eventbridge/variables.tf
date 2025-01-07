@@ -12,7 +12,7 @@ variable "env" {
 
 variable "sqs_queues" {
   type        = map(string)
-  description = "Map of module names to their SQS queue ARNs"
+  description = "Map of model names to their SQS queue ARNs"
 }
 
 variable "dlq_arn" {

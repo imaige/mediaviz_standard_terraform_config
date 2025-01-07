@@ -1,9 +1,9 @@
 # sqs/main.tf
 
 locals {
-  lambda_modules = ["lambda-module1", "lambda-module2", "lambda-module3"]
-  eks_modules    = ["eks-module1", "eks-module2", "eks-module3"]
-  all_modules    = concat(local.lambda_modules, local.eks_modules)
+  lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model", "lambda-feature-extraction-model" ]
+  eks_models    = ["eks-image-classification-model"]
+  all_models    = concat(local.lambda_models, local.eks_models)
   
   # Normalize tags to lowercase to prevent case-sensitivity issues
   normalized_tags = {
@@ -53,24 +53,24 @@ resource "aws_sqs_queue" "image_processing_dlq" {
   })
 }
 
-# Processing queues for all modules
-resource "aws_sqs_queue" "module_queues" {
-  for_each = toset(local.all_modules)
+# Processing queues for all models
+resource "aws_sqs_queue" "model_queues" {
+  for_each = toset(local.all_models)
 
   name = "${var.project_name}-${var.env}-${each.key}-queue"
   
-  visibility_timeout_seconds = try(var.module_specific_config[each.key].visibility_timeout, var.visibility_timeout)
+  visibility_timeout_seconds = try(var.model_specific_config[each.key].visibility_timeout, var.visibility_timeout)
   message_retention_seconds  = var.retention_period
-  delay_seconds             = try(var.module_specific_config[each.key].delay_seconds, var.delay_seconds)
+  delay_seconds             = try(var.model_specific_config[each.key].delay_seconds, var.delay_seconds)
   max_message_size          = var.max_message_size
   receive_wait_time_seconds = 20
   
   sqs_managed_sse_enabled = true
   
   redrive_policy = var.enable_dlq ? jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.module_dlqs[each.key].arn
+    deadLetterTargetArn = aws_sqs_queue.model_dlqs[each.key].arn
     maxReceiveCount     = coalesce(
-      try(var.module_specific_config[each.key].max_receive_count, null),
+      try(var.model_specific_config[each.key].max_receive_count, null),
       var.max_receive_count,
       3
     )
@@ -78,15 +78,15 @@ resource "aws_sqs_queue" "module_queues" {
 
   tags = merge(local.normalized_tags, {
     environment = var.env
-    module      = each.key
+    model      = each.key
     type        = can(regex("^lambda-", each.key)) ? "lambda" : "eks"
     terraform   = "true"
   })
 }
 
 # Module DLQs
-resource "aws_sqs_queue" "module_dlqs" {
-  for_each = var.enable_dlq ? toset(local.all_modules) : []
+resource "aws_sqs_queue" "model_dlqs" {
+  for_each = var.enable_dlq ? toset(local.all_models) : []
   
   name = "${var.project_name}-${var.env}-${each.key}-dlq"
   
@@ -97,7 +97,7 @@ resource "aws_sqs_queue" "module_dlqs" {
   
   tags = merge(local.normalized_tags, {
     environment = var.env
-    module      = each.key
+    model      = each.key
     type        = "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}-dlq"
     terraform   = "true"
   })
@@ -141,10 +141,10 @@ resource "aws_sqs_queue_policy" "image_processing" {
 }
 
 # Module queue policies
-resource "aws_sqs_queue_policy" "module_queues" {
-  for_each = toset(local.all_modules)
+resource "aws_sqs_queue_policy" "model_queues" {
+  for_each = toset(local.all_models)
 
-  queue_url = aws_sqs_queue.module_queues[each.key].url
+  queue_url = aws_sqs_queue.model_queues[each.key].url
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -156,7 +156,7 @@ resource "aws_sqs_queue_policy" "module_queues" {
           Service = "events.amazonaws.com"
         }
         Action = ["sqs:SendMessage"]
-        Resource = aws_sqs_queue.module_queues[each.key].arn
+        Resource = aws_sqs_queue.model_queues[each.key].arn
         Condition = {
           ArnLike = {
             "aws:SourceArn": var.source_arns
@@ -175,14 +175,14 @@ resource "aws_sqs_queue_policy" "module_queues" {
           "sqs:GetQueueAttributes",
           "sqs:ChangeMessageVisibility"
         ]
-        Resource = aws_sqs_queue.module_queues[each.key].arn
+        Resource = aws_sqs_queue.model_queues[each.key].arn
       },
       {
         Sid = "DenyNonSSLAccess"
         Effect = "Deny"
         Principal = "*"
         Action = "*"
-        Resource = aws_sqs_queue.module_queues[each.key].arn
+        Resource = aws_sqs_queue.model_queues[each.key].arn
         Condition = {
           Bool = {
             "aws:SecureTransport": "false"

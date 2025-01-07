@@ -10,8 +10,8 @@ locals {
 
 data "archive_file" "lambda_package" {
   type        = "zip"
-  source_dir  = "${path.module}/functions/image_upload"
-  output_path = "${path.module}/dist/image_upload.zip"
+  source_dir  = "${path.model}/functions/image_upload"
+  output_path = "${path.model}/dist/image_upload.zip"
 }
 
 resource "aws_lambda_function" "image_upload" {

@@ -89,14 +89,14 @@ variable "tags" {
   default     = {}
 }
 
-# Module-specific settings
-variable "module_specific_config" {
+# Model-specific settings
+variable "model_specific_config" {
   type = map(object({
     visibility_timeout = optional(number)
     max_receive_count = optional(number)
     delay_seconds    = optional(number)
     policy_statements = optional(list(any))
   }))
-  description = "Module-specific configurations for each processing queue"
+  description = "Model-specific configurations for each processing queue"
   default     = {}
 }
