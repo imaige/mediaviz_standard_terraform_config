@@ -23,12 +23,6 @@ variable "lambda_security_group_id" {
   description = "Security group ID of Lambda functions"
 }
 
-variable "engine_version" {
-  type        = string
-  description = "Aurora PostgreSQL engine version"
-  default     = "13.9"
-}
-
 variable "database_name" {
   type        = string
   description = "Name of the default database"
@@ -80,4 +74,18 @@ variable "tags" {
   type        = map(string)
   description = "Additional tags for resources"
   default     = {}
+}
+
+# Add these variables to your existing variables.tf
+variable "publicly_accessible" {
+  type        = string
+  description = "Whether the Aurora instances should be publicly accessible"
+  default     = false
+}
+
+# Update your existing engine_version variable
+variable "engine_version" {
+  type        = string
+  description = "Aurora PostgreSQL engine version"
+  default     = "16.3"  # Changed from 13.9
 }

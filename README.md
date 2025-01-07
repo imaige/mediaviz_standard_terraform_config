@@ -121,6 +121,100 @@ Our GitHub Actions workflow:
 3. Creates plan on PR
 4. Applies changes only after merge to main
 
+# Database Access
+
+## Aurora Serverless v2
+
+The Aurora PostgreSQL database is deployed in private subnets and is not publicly accessible. Access is managed through a bastion host.
+
+## Accessing the Database
+
+1. Download the bastion host SSH key:
+```bash
+# Retrieve SSH key from Secrets Manager
+aws secretsmanager get-secret-value \
+    --secret-id mediaviz-dev-bastion-key \
+    --query 'SecretString' \
+    --output text > mediaviz-dev-bastion.pem
+
+# Set correct permissions
+chmod 400 mediaviz-dev-bastion.pem
+```
+
+2. Create SSH tunnel through bastion host:
+```bash
+ssh -i mediaviz-dev-bastion.pem -L 5433:mediaviz-serverless-dev-aurora.cluster-cotsmbbj0vgr.us-east-2.rds.amazonaws.com:5432 ubuntu@3.129.70.11
+```
+
+3. Connect to the database through the tunnel:
+```bash
+psql -h localhost -p 5433 -U postgres -d imaige
+```
+
+4. Database credentials can be retrieved from Secrets Manager:
+```bash
+# Get Aurora credentials
+aws secretsmanager get-secret-value \
+    --secret-id mediaviz-serverless-dev-aurora-credentials-pg \
+    --query 'SecretString' \
+    --output text | jq '.'
+```
+
+## Security Notes
+
+- The database is not publicly accessible
+- All access is controlled via the bastion host
+- SSH key and database credentials are stored in AWS Secrets Manager
+- Always use SSH tunneling for database connections
+- Never expose database credentials in code or version control
+
+## Common Database Operations
+
+### Checking Available Tables
+```bash
+# List all tables in the public schema
+psql -h localhost -p 5433 -U postgres -d imaige -c "\dt public.*;"
+
+# Get detailed table information
+psql -h localhost -p 5433 -U postgres -d imaige -c "\d+"
+```
+
+### Database Migration
+When migrating data from another database:
+```bash
+# Example using pg_dump through SSH tunnel
+PGPASSWORD='source_password' pg_dump \
+    -h source_host \
+    -p 5432 \
+    -U postgres \
+    -d source_db \
+    --exclude-table-data 'pattern_to_exclude' \
+    --no-owner \
+    --no-acl \
+    | PGPASSWORD='target_password' psql \
+    -h localhost \
+    -p 5433 \
+    -U postgres \
+    -d imaige
+```
+
+## Troubleshooting
+
+1. If port 5433 is already in use:
+   - Try a different local port (e.g., 5434)
+   - Or check and kill existing PostgreSQL processes
+
+2. If SSH connection fails:
+   - Verify bastion host IP is current
+   - Check security group allows your IP
+   - Ensure correct permissions on .pem file (chmod 400)
+
+3. If database connection fails:
+   - Verify you're using the correct credentials
+   - Ensure SSH tunnel is active
+   - Check if the database is running
+
+
 ## Common Issues
 
 1. **SSO Session Expired**: Run `aws sso login --profile mediaviz` to refresh
