@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model1-processor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model1-processor
+  template:
+    metadata:
+      labels:
+        app: model1-processor
+    spec:
+      containers:
+      - name: model1-container
+        image: your-docker-repo/model1-processor:latest
+        env:
+        - name: SQS_QUEUE_URL
+          value: https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel1Queue
+        - name: AWS_REGION
+          value: us-west-2
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
