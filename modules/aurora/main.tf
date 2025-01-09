@@ -214,3 +214,14 @@ resource "aws_iam_role_policy_attachment" "enhanced_monitoring" {
   role       = aws_iam_role.enhanced_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
+
+# Allow inbound PostgreSQL access from EKS nodes
+resource "aws_security_group_rule" "aurora_eks_ingress" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = var.eks_node_security_group_id
+  security_group_id        = aws_security_group.aurora.id
+  description             = "Allow PostgreSQL access from EKS nodes"
+}

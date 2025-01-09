@@ -37,20 +37,3 @@ output "database_name" {
   description = "Name of the default database"
   value       = aws_rds_cluster.aurora.database_name
 }
-
-
-PGPASSWORD='dguCm3C9nH5JbAh8Q&LvMfw*' /opt/homebrew/opt/postgresql@16/bin/pg_dump \
-    -h dev-mediaviz.cotsmbbj0vgr.us-east-2.rds.amazonaws.com \
-    -p 5432 \
-    -U postgres \
-    -d postgres \
-    --exclude-table-data 'z_*' \
-    --exclude-table 'z_*' \
-    -n public \
-    --no-owner \
-    --no-acl \
-    | PGPASSWORD=nwkejC33ysojuKMz /opt/homebrew/opt/postgresql@16/bin/psql \
-    -h localhost \
-    -p 5433 \
-    -U postgres \
-    -d imaige

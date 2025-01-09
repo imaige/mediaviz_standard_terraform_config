@@ -22,9 +22,10 @@ module "eks" {
   node_group_max_size       = var.node_group_max_size
   node_group_desired_size   = var.node_group_desired_size
 
-  aws_account_id = var.aws_account_id
-  kms_key_arn    = module.security.kms_key_arn
-  kms_key_id     = module.security.kms_key_id
+  aws_account_id     = var.aws_account_id
+  kms_key_arn        = module.security.kms_key_arn
+  kms_key_id         = module.security.kms_key_id
+  eks_admin_role_arn = module.security.eks_admin_role_arn 
 }
 
 # New Serverless Infrastructure
@@ -156,6 +157,9 @@ module "security" {
   env          = var.env
   kms_key_arn  = module.security.kms_key_arn
   kms_key_id   = module.security.kms_key_id
+  # eks_node_role_arn = module.eks.eks_managed_node_role_arn
+  tags = var.tags
+
 }
 
 module "eks_functions" {
@@ -187,10 +191,11 @@ module "aurora" {
   vpc_id       = module.vpc.vpc_id
   subnet_ids   = module.vpc.private_subnets
 
-  database_name            = "imaige"
-  lambda_security_group_id = module.lambda_processors.all_security_group_ids[0]
-  engine_version           = "16.3"
-  publicly_accessible      = true
+  database_name              = "imaige"
+  lambda_security_group_id   = module.lambda_processors.all_security_group_ids[0]
+  engine_version             = "16.3"
+  publicly_accessible        = true
+  eks_node_security_group_id = module.eks.node_security_group_id
 
   min_capacity = 0.5
   max_capacity = 16
@@ -206,8 +211,11 @@ module "bastion" {
   vpc_id           = module.vpc.vpc_id
   public_subnet_id = module.vpc.public_subnets[0]
   allowed_ips = [
-    "24.5.226.154/32",    # Office IP
+    "24.5.226.154/32",
+    "73.169.81.101/32",
+    "67.241.163.178/32",
+    "76.155.77.153/32"
   ]
-  aurora_endpoint  = module.aurora.cluster_endpoint
-  tags = var.tags
+  aurora_endpoint = module.aurora.cluster_endpoint
+  tags            = var.tags
 }

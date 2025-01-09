@@ -12,11 +12,25 @@ module "eks" {
   # Security configurations
   cluster_endpoint_public_access = true
   cluster_endpoint_private_access = true
+  enable_irsa = true
+
+  # Authentication configuration
+  authentication_mode = "API"
   
-  cluster_encryption_config = {
-    provider_key_arn = var.kms_key_arn
-    resources        = ["secrets"]
+  access_entries = {
+    # Admin access
+    admin = {
+      kubernetes_groups = ["cluster-admin"]
+      principal_arn    = var.eks_admin_role_arn
+      type            = "STANDARD"
+    }
   }
+  
+  # cluster_encryption_config = {
+  #   provider_key_arn = var.kms_key_arn
+  #   resources        = ["secrets"]
+  # }
+
 
   cluster_addons = {
     coredns = {
@@ -36,6 +50,7 @@ module "eks" {
     }
   }
 
+  enable_cluster_creator_admin_permissions = true
   eks_managed_node_groups = {
     primary_node_group = {
       ami_type       = "AL2023_x86_64_STANDARD"

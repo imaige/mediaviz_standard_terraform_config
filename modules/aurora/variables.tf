@@ -89,3 +89,8 @@ variable "engine_version" {
   description = "Aurora PostgreSQL engine version"
   default     = "16.3"  # Changed from 13.9
 }
+
+variable "eks_node_security_group_id" {
+  description = "Security group ID of the EKS nodes"
+  type        = string
+}

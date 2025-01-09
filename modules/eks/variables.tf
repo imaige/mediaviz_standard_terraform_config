@@ -67,3 +67,8 @@ variable "kms_key_id" {
   description = "ID of the KMS key for encryption"
   type        = string
 }
+
+variable "eks_admin_role_arn" {
+  description = "ARN of the EKS administrator role from SSO"
+  type        = string
+}
