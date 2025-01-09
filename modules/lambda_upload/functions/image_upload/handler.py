@@ -59,19 +59,19 @@ class ImageUploadHandler:
             'body': json.dumps(body)
         }
         
-    # def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str) -> bool:
-    #     """Upload file to S3 with metadata."""
-    #     try:
-    #         self.s3_client.put_object(
-    #             Bucket=bucket_name,
-    #             Key=file_path,
-    #             Body=file_content,
-    #             ContentType='image/jpeg'
-    #         )
-    #         return True
-    #     except ClientError as e:
-    #         logger.error(f"Error uploading to S3: {str(e)}")
-    #         return False
+    def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str) -> bool:
+        """Upload file to S3 with metadata."""
+        try:
+            self.s3_client.put_object(
+                Bucket=bucket_name,
+                Key=file_path,
+                Body=file_content,
+                ContentType='image/jpeg'
+            )
+            return True
+        except ClientError as e:
+            logger.error(f"Error uploading to S3: {str(e)}")
+            return False
             
     def insert_photo_to_database(
             self,
@@ -148,22 +148,19 @@ class ImageUploadHandler:
             logger.error(f"Error generating record for photo from request {request_id} for client {company_id}")
 
 
-    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, key: str, company_id: int, photo_id: int, photo_s3_url: str, models: List[str], timestamp) -> bool:
+    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, photo_id: int, photo_s3_url: str, models: List[str], timestamp) -> bool:
         """Send processing events to EventBridge."""
         try:
             # Prepare common event details
             common_detail = {
-                'request_id': uuid,
+                'request_id': request_id,
                 'bucket': bucket,
-                'key': key,
-                'company_id': company_id,
                 'photo_id': photo_id,
                 'timestamp': timestamp,
                 'version': '1.0',
                 'photo_s3_link': photo_s3_url
             }
 
-            # TODO: main upload event should already have happened at this point
             # Send main upload event
             main_event = {
                 'Source': 'custom.imageUpload',
@@ -175,12 +172,14 @@ class ImageUploadHandler:
                 'EventBusName': 'default'
             }
 
-            # Send events for each processing model
+            # TODO: why are we registering this upload as an event? this lambda's trigger is a s3.put_object so that is already there
             events = [main_event]
+
+            # Send events for each processing model
             for model_name in models:
                 event = {
                     'Source': 'custom.imageUpload',
-                    'DetailType': f"{model_name.title()}Processing",
+                    'DetailType': f"{model_name}_processing",
                     'Detail': json.dumps({
                         **common_detail,
                         'processingType': model_name
@@ -204,43 +203,59 @@ class ImageUploadHandler:
             if 'body' not in event:
                 return self.create_response(400, {'error': 'No file content found'})
 
+            # Option 1 - event is a request to API gateway with bucket-name and file-path in headers, photo in body
+            # rest of data will be in either metadata
             headers = self.extract_and_validate_header_photo_details(event)
             if not headers:
                 self.create_response(400, {'error': 'Header does not contain required detail'})
 
             # body processing unnecessary since the file data should already be in S3
-            # body = event['body']
+            body = event['body']
+            files = event['files']
+            photo = files.get("image_data_encoded")
+
             bucket_name = headers.get('bucket_name')
             file_name = headers.get('file_name')
-            s3_response = self.s3_client.head_object(
-                Bucket=bucket_name,
-                Key=file_name
-            )
-            metadata = s3_response['Metadata']
+            # s3_response = self.s3_client.head_object(
+            #     Bucket=bucket_name,
+            #     Key=file_name
+            # )
 
-            s3_url = f"https://{bucket_name}.s3.{self.region}.amazonaws.com/{file_name}"
+            # __________________________________________________________________________________________________________
+
+            # Option 2 - event is the S3 upload itself
+            # for record in event["Records"]:
+            #     bucket_name = record["s3"]["bucket"]["name"]
+            #     file_name = record["s3"]["object"]["key"]
+            #
+            #     # Fetch object metadata
+            #     s3_response = self.s3_client.head_object(Bucket=bucket_name, Key=key)
+
+            # metadata = s3_response['Metadata']
+
+            # Generate file path
+            file_path = f"uploads/{file_name}"
+            s3_url = f"https://{bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
 
             # Extract required fields from body
-            # Extract image and process (may be done later)
-            # photo = body.get("image_data_encoded")
             # TODO: crystallize request format for request/EventBridge event/S3 photo publish that the frontend will use
-            models = metadata.get("models")
-            bucket_name = metadata.get("bucket_name")
-            user_id = metadata.get("user_id")
-            company_id = metadata.get("company_id")
+            models = body.get("models")
+            bucket_name = body.get("bucket_name")
+            user_id = body.get("user_id")
+            company_id = body.get("company_id")
             photo_s3_link = s3_url
-            project_table_name = metadata.get("project_table_name")
-            client_side_id = metadata.get("client_side_id")
-            file_path = metadata.get("file_path")
-            title = metadata.get("title")
-            description = metadata.get("description")
-            format = metadata.get("format")
-            size = metadata.get("size")
-            source_resolution_x = metadata.get("source_resolution_x")
-            source_resolution_y = metadata.get("source_resolution_y")
-            date_taken = metadata.get("date_taken")
-            latitude = metadata.get("latitude")
-            longitude = metadata.get("longitude")
+            project_table_name = body.get("project_table_name")
+            client_side_id = body.get("client_side_id")
+            file_path = body.get("file_path")
+            title = body.get("title")
+            description = body.get("description")
+            format = body.get("format")
+            size = body.get("size")
+            source_resolution_x = body.get("source_resolution_x")
+            source_resolution_y = body.get("source_resolution_y")
+            date_taken = body.get("date_taken")
+            latitude = body.get("latitude")
+            longitude = body.get("longitude")
 
             # TODO: validate company_id and user_id?
 
@@ -274,15 +289,14 @@ class ImageUploadHandler:
                 longitude
             )
 
-            # Generate file path
-            file_path = f"uploads/{file_name}"
-
             # Upload to S3 - we don't actually have to do this because the upload is being done as S3.put_object, so it's already in there
-            # TODO: add retry logic on F/E
+            # TODO: add retry logic on F/E?
+            if not self.upload_to_s3(photo, file_path, bucket_name):
+                return self.create_response(500, {'error': f'Failed to upload file for photo {photo_id}'})
 
             # Send events to EventBridge - retry handled by DLQ
             if not self.send_events_to_eventbridge(
-                bucket_name, request_id, file_path, company_id, photo_id, s3_url, models, timestamp
+                request_id, bucket_name, photo_id, s3_url, models, timestamp
             ):
                 logger.error(f"Warning: EventBridge event sending failed for photo {photo_id}")
 
