@@ -28,6 +28,26 @@ class ImageUploadHandler:
         self.rds_client = boto3.client('rds-data', config=config)
         self.region = self.s3_client.meta.region_name
 
+    def extract_and_validate_header_photo_details(self, event: Dict[str, Any]) -> Optional[Dict]:
+        """Extract client_id from event headers or query parameters."""
+        if 'headers' in event:
+            if 'x-bucket-name' in event['headers'] and 'x-file-name' in event['headers']:
+                return {
+                    'bucket-name': event['headers']['x-bucket-name'],
+                    'file-name': event['headers']['x-file-name']
+                }
+            else:
+                return None
+        elif 'queryStringParameters' in event and event['queryStringParameters']:
+            if 'bucket_name' in event['queryStringParameters'] and 'file_name' in event['queryStringParameters']:
+                return {
+                    'bucket-name': event['queryStringParameters']['bucket_name'],
+                    'file-name': event['queryStringParameters']['file_name']
+                }
+            else:
+                return None
+        return None
+
     def create_response(self, status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
         """Create standardized API response."""
         return {
@@ -39,19 +59,19 @@ class ImageUploadHandler:
             'body': json.dumps(body)
         }
         
-    def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str) -> bool:
-        """Upload file to S3 with metadata."""
-        try:
-            self.s3_client.put_object(
-                Bucket=bucket_name,
-                Key=file_path,
-                Body=file_content,
-                ContentType='image/jpeg'
-            )
-            return True
-        except ClientError as e:
-            logger.error(f"Error uploading to S3: {str(e)}")
-            return False
+    # def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str) -> bool:
+    #     """Upload file to S3 with metadata."""
+    #     try:
+    #         self.s3_client.put_object(
+    #             Bucket=bucket_name,
+    #             Key=file_path,
+    #             Body=file_content,
+    #             ContentType='image/jpeg'
+    #         )
+    #         return True
+    #     except ClientError as e:
+    #         logger.error(f"Error uploading to S3: {str(e)}")
+    #         return False
             
     def insert_photo_to_database(
             self,
@@ -139,11 +159,11 @@ class ImageUploadHandler:
                 'company_id': company_id,
                 'photo_id': photo_id,
                 'timestamp': timestamp,
-                'version': '1.0'
+                'version': '1.0',
+                'photo_s3_link': photo_s3_url
             }
 
             # TODO: main upload event should already have happened at this point
-            # TODO: need photo S3 link in here so we can access in AI models
             # Send main upload event
             main_event = {
                 'Source': 'custom.imageUpload',
@@ -157,20 +177,17 @@ class ImageUploadHandler:
 
             # Send events for each processing model
             events = [main_event]
-            # TODO: iterate over list of models passed rather than arbitrary list
-            for model_type in ['lambda', 'eks']:
-                for model_num in range(1, 4):
-                    model_name = f"{model_type}-model{model_num}"
-                    event = {
-                        'Source': 'custom.imageUpload',
-                        'DetailType': f"{model_name.title()}Processing",
-                        'Detail': json.dumps({
-                            **common_detail,
-                            'processingType': model_name
-                        }),
-                        'EventBusName': 'default'
-                    }
-                    events.append(event)
+            for model_name in models:
+                event = {
+                    'Source': 'custom.imageUpload',
+                    'DetailType': f"{model_name.title()}Processing",
+                    'Detail': json.dumps({
+                        **common_detail,
+                        'processingType': model_name
+                    }),
+                    'EventBusName': 'default'
+                }
+                events.append(event)
 
             # Send all events in a single batch
             self.eventbridge_client.put_events(Entries=events)
@@ -187,36 +204,51 @@ class ImageUploadHandler:
             if 'body' not in event:
                 return self.create_response(400, {'error': 'No file content found'})
 
-            body = event['body']
+            headers = self.extract_and_validate_header_photo_details(event)
+            if not headers:
+                self.create_response(400, {'error': 'Header does not contain required detail'})
+
+            # body processing unnecessary since the file data should already be in S3
+            # body = event['body']
+            bucket_name = headers.get('bucket_name')
+            file_name = headers.get('file_name')
+            s3_response = self.s3_client.head_object(
+                Bucket=bucket_name,
+                Key=file_name
+            )
+            metadata = s3_response['Metadata']
+
+            s3_url = f"https://{bucket_name}.s3.{self.region}.amazonaws.com/{file_name}"
 
             # Extract required fields from body
+            # Extract image and process (may be done later)
+            # photo = body.get("image_data_encoded")
             # TODO: crystallize request format for request/EventBridge event/S3 photo publish that the frontend will use
-            models = body.get("models")
-            bucket_name = body.get("bucket_name")
-            user_id = body.get("user_id")
-            company_id = body.get("company_id")
-            # TODO: figure out order of ops for generating photo_id in DB and S3 link on AWS
-            photo_s3_link = body.get("photo_s3_link")
-            project_table_name = body.get("project_table_name")
-            client_side_id = body.get("client_side_id")
-            file_path = body.get("file_path")
-            title = body.get("title")
-            description = body.get("description")
-            format = body.get("format")
-            size = body.get("size")
-            source_resolution_x = body.get("source_resolution_x")
-            source_resolution_y = body.get("source_resolution_y")
-            date_taken = body.get("date_taken")
-            latitude = body.get("latitude")
-            longitude = body.get("longitude")
+            models = metadata.get("models")
+            bucket_name = metadata.get("bucket_name")
+            user_id = metadata.get("user_id")
+            company_id = metadata.get("company_id")
+            photo_s3_link = s3_url
+            project_table_name = metadata.get("project_table_name")
+            client_side_id = metadata.get("client_side_id")
+            file_path = metadata.get("file_path")
+            title = metadata.get("title")
+            description = metadata.get("description")
+            format = metadata.get("format")
+            size = metadata.get("size")
+            source_resolution_x = metadata.get("source_resolution_x")
+            source_resolution_y = metadata.get("source_resolution_y")
+            date_taken = metadata.get("date_taken")
+            latitude = metadata.get("latitude")
+            longitude = metadata.get("longitude")
 
             # TODO: validate company_id and user_id?
 
-            # Decode file content
-            try:
-                file_content = base64.b64decode(body.get("image_data_encoded"))
-            except Exception:
-                return self.create_response(400, {'error': 'Invalid file content'})
+            # Decode file content - unnecessary since the file content should already be in S3
+            # try:
+            #     file_content = base64.b64decode(body.get("image_data_encoded"))
+            # except Exception:
+            #     return self.create_response(400, {'error': 'Invalid file content'})
 
             # Generate file metadata
             timestamp = str(int(time.time()))
@@ -243,14 +275,10 @@ class ImageUploadHandler:
             )
 
             # Generate file path
-            file_path = f"uploads/{photo_id}"
+            file_path = f"uploads/{file_name}"
 
-            # Upload to S3 - TODO potentially put this before DB insert because S3 link doesn't need to rely on photo_id
-            # TODO: add retry logic (potentially on FE as well)
-            if not self.upload_to_s3(file_content, file_path, bucket_name):
-                return self.create_response(500, {'error': f'Failed to upload file for photo {photo_id}'})
-
-            s3_url = f"https://{bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
+            # Upload to S3 - we don't actually have to do this because the upload is being done as S3.put_object, so it's already in there
+            # TODO: add retry logic on F/E
 
             # Send events to EventBridge - retry handled by DLQ
             if not self.send_events_to_eventbridge(
