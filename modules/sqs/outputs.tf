@@ -11,11 +11,11 @@ output "queue_url" {
   value       = aws_sqs_queue.image_processing.url
 }
 
-# Module queues outputs
-output "module_queues" {
-  description = "Map of all module queue details"
+# Model queues outputs
+output "model_queues" {
+  description = "Map of all model queue details"
   value = {
-    for k, v in aws_sqs_queue.module_queues : k => {
+    for k, v in aws_sqs_queue.model_queues : k => {
       arn         = v.arn
       url         = v.url
       name        = v.name
@@ -26,34 +26,34 @@ output "module_queues" {
 
 # Lambda-specific queue outputs
 output "lambda_queue_arns" {
-  description = "Map of Lambda module names to their queue ARNs"
+  description = "Map of Lambda model names to their queue ARNs"
   value = {
-    for k, v in aws_sqs_queue.module_queues : k => v.arn
+    for k, v in aws_sqs_queue.model_queues : k => v.arn
     if can(regex("^lambda-", k))
   }
 }
 
 output "lambda_queue_urls" {
-  description = "Map of Lambda module names to their queue URLs"
+  description = "Map of Lambda model names to their queue URLs"
   value = {
-    for k, v in aws_sqs_queue.module_queues : k => v.url
+    for k, v in aws_sqs_queue.model_queues : k => v.url
     if can(regex("^lambda-", k))
   }
 }
 
 # EKS-specific queue outputs
 output "eks_queue_arns" {
-  description = "Map of EKS module names to their queue ARNs"
+  description = "Map of EKS model names to their queue ARNs"
   value = {
-    for k, v in aws_sqs_queue.module_queues : k => v.arn
+    for k, v in aws_sqs_queue.model_queues : k => v.arn
     if can(regex("^eks-", k))
   }
 }
 
 output "eks_queue_urls" {
-  description = "Map of EKS module names to their queue URLs"
+  description = "Map of EKS model names to their queue URLs"
   value = {
-    for k, v in aws_sqs_queue.module_queues : k => v.url
+    for k, v in aws_sqs_queue.model_queues : k => v.url
     if can(regex("^eks-", k))
   }
 }
@@ -69,10 +69,10 @@ output "dlq_url" {
   value       = var.enable_dlq ? aws_sqs_queue.image_processing_dlq[0].url : null
 }
 
-output "module_dlqs" {
-  description = "Map of module DLQ details"
+output "model_dlqs" {
+  description = "Map of model DLQ details"
   value = var.enable_dlq ? {
-    for k, v in aws_sqs_queue.module_dlqs : k => {
+    for k, v in aws_sqs_queue.model_dlqs : k => {
       arn = v.arn
       url = v.url
       name = v.name
@@ -82,10 +82,10 @@ output "module_dlqs" {
 
 # Aggregated outputs for easy reference
 output "all_queue_arns" {
-  description = "List of all queue ARNs including main queue and module queues"
+  description = "List of all queue ARNs including main queue and model queues"
   value = concat(
     [aws_sqs_queue.image_processing.arn],
-    [for q in aws_sqs_queue.module_queues : q.arn]
+    [for q in aws_sqs_queue.model_queues : q.arn]
   )
 }
 
@@ -93,7 +93,7 @@ output "all_dlq_arns" {
   description = "List of all DLQ ARNs if enabled"
   value = var.enable_dlq ? concat(
     [aws_sqs_queue.image_processing_dlq[0].arn],
-    [for q in aws_sqs_queue.module_dlqs : q.arn]
+    [for q in aws_sqs_queue.model_dlqs : q.arn]
   ) : []
 }
 
@@ -105,7 +105,7 @@ output "queue_names" {
       main = aws_sqs_queue.image_processing.name
     },
     {
-      for k, v in aws_sqs_queue.module_queues : k => v.name
+      for k, v in aws_sqs_queue.model_queues : k => v.name
     }
   )
 }

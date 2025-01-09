@@ -11,7 +11,7 @@ output "image_upload_rule_name" {
 }
 
 output "processing_rules" {
-  description = "Map of processing rule details by module"
+  description = "Map of processing rule details by model"
   value = {
     for k, v in aws_cloudwatch_event_rule.processing_rules : k => {
       arn  = v.arn
@@ -57,7 +57,7 @@ output "event_bus_rule_arns" {
 
 # Optional: Add target details if needed
 output "target_ids" {
-  description = "Map of target IDs by module"
+  description = "Map of target IDs by model"
   value = {
     for k, v in aws_cloudwatch_event_target.processor_targets : k => v.target_id
   }
