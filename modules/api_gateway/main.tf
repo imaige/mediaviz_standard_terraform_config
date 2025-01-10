@@ -7,6 +7,14 @@ resource "aws_api_gateway_rest_api" "image_upload" {
     types = ["REGIONAL"]
   }
 
+  # Add binary media types support
+  binary_media_types = [
+    "multipart/form-data",
+    "image/jpeg",
+    "image/png",
+    "image/gif"
+  ]
+
   # Enable Create before destroy
   lifecycle {
     create_before_destroy = true
@@ -18,10 +26,10 @@ resource "aws_api_gateway_rest_api" "image_upload" {
 #   web_acl_id   = var.waf_acl_id
 # }
 
-resource "aws_wafv2_web_acl_association" "api_waf" {
-  resource_arn = aws_api_gateway_stage.api_stage.arn
-  web_acl_arn  = var.waf_acl_arn  # Changed from web_acl_id
-}
+# resource "aws_wafv2_web_acl_association" "api_waf" {
+#   resource_arn = aws_api_gateway_stage.api_stage.arn
+#   web_acl_arn  = var.waf_acl_arn  # Changed from web_acl_id
+# }
 
 # Add request validation
 resource "aws_api_gateway_request_validator" "validator" {
@@ -36,12 +44,22 @@ resource "aws_api_gateway_method" "upload_post" {
   rest_api_id   = aws_api_gateway_rest_api.image_upload.id
   resource_id   = aws_api_gateway_resource.upload.id
   http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
-  request_validator_id = aws_api_gateway_request_validator.validator.id
-
+  authorization = "NONE"
   request_parameters = {
-    "method.request.header.Authorization" = true
+    "method.request.header.Content-Type" = true
+    "method.request.header.Accept"       = true
+  }
+}
+
+# Add method response for POST
+resource "aws_api_gateway_method_response" "post_200" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+  resource_id = aws_api_gateway_resource.upload.id
+  http_method = aws_api_gateway_method.upload_post.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
   }
 }
 
@@ -174,10 +192,12 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   rest_api_id = aws_api_gateway_rest_api.image_upload.id
   resource_id = aws_api_gateway_resource.upload.id
   http_method = aws_api_gateway_method.upload_post.http_method
-
+  
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = var.lambda_invoke_arn
+  
+  content_handling = "CONVERT_TO_BINARY"
 }
 
 resource "aws_api_gateway_method" "upload_options" {
@@ -224,6 +244,21 @@ resource "aws_api_gateway_method_response" "options_200" {
     "method.response.header.Access-Control-Allow-Methods" = true,
     "method.response.header.Access-Control-Allow-Origin"  = true
   }
+}
+
+resource "aws_api_gateway_integration_response" "lambda_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.image_upload.id
+  resource_id = aws_api_gateway_resource.upload.id
+  http_method = aws_api_gateway_method.upload_post.http_method
+  status_code = aws_api_gateway_method_response.post_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.lambda_integration
+  ]
 }
 
 resource "aws_api_gateway_integration_response" "options_integration_response" {

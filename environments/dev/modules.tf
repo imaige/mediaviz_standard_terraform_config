@@ -22,9 +22,10 @@ module "eks" {
   node_group_max_size       = var.node_group_max_size
   node_group_desired_size   = var.node_group_desired_size
 
-  aws_account_id = var.aws_account_id
-  kms_key_arn    = module.security.kms_key_arn
-  kms_key_id     = module.security.kms_key_id
+  aws_account_id     = var.aws_account_id
+  kms_key_arn        = module.security.kms_key_arn
+  kms_key_id         = module.security.kms_key_id
+  eks_admin_role_arn = module.security.eks_admin_role_arn 
 }
 
 # New Serverless Infrastructure
@@ -92,10 +93,10 @@ module "api_gateway" {
 
 module "eventbridge" {
   source = "./../../modules/eventbridge"
-  
+
   project_name = var.project_name
-  env         = var.env
-  
+  env          = var.env
+
   sqs_queues = {
     l-blur-model                  = module.sqs.lambda_queue_arns["l-blur-model"]
     l-colors-model                = module.sqs.lambda_queue_arns["l-colors-model"]
@@ -104,7 +105,7 @@ module "eventbridge" {
     l-feature-extraction-model    = module.sqs.lambda_queue_arns["l-feature-extraction-mode"]
     eks-img-classification-model  = module.sqs.eks_queue_arns["eks-image-classification-model"]
   }
-  
+
   dlq_arn = module.sqs.dlq_arn
   tags    = var.tags
 }
@@ -113,39 +114,39 @@ module "sqs" {
   source = "./../../modules/sqs"
 
   project_name = var.project_name
-  env         = var.env
-  
+  env          = var.env
+
   # Base configuration
-  visibility_timeout = 300  # 5 minutes
-  enable_dlq        = true
-  max_receive_count = 3
-  
+  visibility_timeout = 300 # 5 minutes
+  enable_dlq         = true
+  max_receive_count  = 3
+
   # Source ARNs
   source_arns = concat(
     [module.lambda_upload.function_arn],
     module.eventbridge.event_bus_rule_arns
   )
-  
+
   # Access permissions
   lambda_role_arns = module.lambda_processors.all_role_arns
-  eks_role_arn = module.eks.node_group_role_arn
+  eks_role_arn     = module.eks.node_group_role_arn
 
 
   # Optional: Module-specific configurations
-  module_specific_config = {
+  model_specific_config = {
     "lambda-module1" = {
-      visibility_timeout = 600  # 10 minutes for longer processing
-      max_receive_count = 5
+      visibility_timeout = 600 # 10 minutes for longer processing
+      max_receive_count  = 5
     }
     "eks-module2" = {
-      delay_seconds = 10  # Add delay for this specific module
+      delay_seconds = 10 # Add delay for this specific module
     }
   }
-  
+
   # Optional: KMS encryption
   use_kms_encryption = true
   kms_key_id         = module.security.kms_key_id
-  
+
   tags = var.tags
 }
 
@@ -156,6 +157,9 @@ module "security" {
   env          = var.env
   kms_key_arn  = module.security.kms_key_arn
   kms_key_id   = module.security.kms_key_id
+  # eks_node_role_arn = module.eks.eks_managed_node_role_arn
+  tags = var.tags
+
 }
 
 module "eks_functions" {
@@ -187,11 +191,31 @@ module "aurora" {
   vpc_id       = module.vpc.vpc_id
   subnet_ids   = module.vpc.private_subnets
 
-  database_name            = "imaige"
-  lambda_security_group_id = module.lambda_processors.all_security_group_ids[0]
+  database_name              = "imaige"
+  lambda_security_group_id   = module.lambda_processors.all_security_group_ids[0]
+  engine_version             = "16.3"
+  publicly_accessible        = true
+  eks_node_security_group_id = module.eks.node_security_group_id
 
   min_capacity = 0.5
   max_capacity = 16
 
   tags = var.tags
+}
+
+module "bastion" {
+  source = "./../../modules/bastion"
+
+  project_name     = var.project_name
+  env              = var.env
+  vpc_id           = module.vpc.vpc_id
+  public_subnet_id = module.vpc.public_subnets[0]
+  allowed_ips = [
+    "24.5.226.154/32",
+    "73.169.81.101/32",
+    "67.241.163.178/32",
+    "76.155.77.153/32"
+  ]
+  aurora_endpoint = module.aurora.cluster_endpoint
+  tags            = var.tags
 }

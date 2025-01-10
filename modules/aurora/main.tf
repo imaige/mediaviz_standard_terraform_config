@@ -25,7 +25,7 @@ resource "random_password" "master" {
 
 # Store master credentials in Secrets Manager
 resource "aws_secretsmanager_secret" "aurora" {
-  name = "${var.project_name}-${var.env}-aurora-credentials"
+  name = "${var.project_name}-${var.env}-aurora-credentials-pg"
   kms_key_id = aws_kms_key.aurora.arn
 
   tags = merge(var.tags, {
@@ -81,10 +81,20 @@ resource "aws_security_group_rule" "aurora_ingress" {
   description             = "Allow PostgreSQL access from Lambda functions"
 }
 
+resource "aws_security_group_rule" "aurora_public_access" {
+  type              = "ingress"
+  from_port         = 5432
+  to_port           = 5432
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.aurora.id
+  description       = "Allow public PostgreSQL access"
+}
+
 # Parameter group
 resource "aws_rds_cluster_parameter_group" "aurora" {
-  family = "aurora-postgresql13"
-  name   = "${var.project_name}-${var.env}-aurora-pg"
+  family = "aurora-postgresql16"
+  name   = "${var.project_name}-${var.env}-aurora-pg-16"  #
 
   parameter {
     name  = "log_statement"
@@ -127,6 +137,7 @@ resource "aws_rds_cluster" "aurora" {
   backup_retention_period = var.backup_retention_days
   preferred_backup_window = var.backup_window
   copy_tags_to_snapshot  = true
+  allow_major_version_upgrade = true 
   
   # Maintenance window
   preferred_maintenance_window = var.maintenance_window
@@ -159,6 +170,7 @@ resource "aws_rds_cluster_instance" "aurora" {
   instance_class     = "db.serverless"
   engine            = aws_rds_cluster.aurora.engine
   engine_version    = aws_rds_cluster.aurora.engine_version
+  publicly_accessible = var.publicly_accessible
 
   # Enable Performance Insights
   performance_insights_enabled    = true
@@ -201,4 +213,15 @@ resource "aws_iam_role" "enhanced_monitoring" {
 resource "aws_iam_role_policy_attachment" "enhanced_monitoring" {
   role       = aws_iam_role.enhanced_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
+# Allow inbound PostgreSQL access from EKS nodes
+resource "aws_security_group_rule" "aurora_eks_ingress" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = var.eks_node_security_group_id
+  security_group_id        = aws_security_group.aurora.id
+  description             = "Allow PostgreSQL access from EKS nodes"
 }
