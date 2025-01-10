@@ -2,16 +2,22 @@
 
 locals {
   # Normalize tags to lowercase to prevent case-sensitivity issues
-  normalized_tags = {
-    for key, value in var.tags :
-    lower(key) => value
-  }
+  normalized_tags = merge(
+    {
+      for key, value in var.tags :
+      lower(key) => value
+    },
+    {
+      environment = var.env
+      terraform   = "true"
+    }
+  )
 }
 
 data "archive_file" "lambda_package" {
   type        = "zip"
-  source_dir  = "${path.model}/functions/image_upload"
-  output_path = "${path.model}/dist/image_upload.zip"
+  source_dir  = "${path.module}/functions/image_upload"
+  output_path = "${path.module}/dist/image_upload.zip"
 }
 
 resource "aws_lambda_function" "image_upload" {
@@ -39,7 +45,7 @@ resource "aws_lambda_function" "image_upload" {
   }  
 
   kms_key_arn = var.kms_key_arn
-  code_signing_config_arn = aws_lambda_code_signing_config.signing_config.arn
+#   code_signing_config_arn = aws_lambda_code_signing_config.signing_config.arn
 
   tracing_config {
     mode = "Active"
@@ -112,7 +118,7 @@ resource "aws_sqs_queue" "lambda_dlq" {
 }
 
 resource "aws_security_group" "lambda_sg" {
-  name        = "${var.project_name}-${var.env}-lambda-sg"
+  name        = "${var.project_name}-${var.env}-lambda-sg-new"
   description = "Security group for Lambda function"
   vpc_id      = var.vpc_id
 
@@ -132,6 +138,10 @@ resource "aws_security_group" "lambda_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = merge(local.normalized_tags, {
     environment = var.env
     terraform   = "true"
@@ -139,7 +149,7 @@ resource "aws_security_group" "lambda_sg" {
 }
 
 resource "aws_iam_role" "lambda_role" {
-  name = "${var.project_name}-${var.env}-lambda-role"
+  name = "${var.project_name}-${var.env}-lambda-role-new"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -154,10 +164,9 @@ resource "aws_iam_role" "lambda_role" {
     ]
   })
 
-  tags = merge(local.normalized_tags, {
-    environment = var.env
-    terraform   = "true"
-  })
+#   tags = merge( {
+#     environment = "dev-new1"
+#   })
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
