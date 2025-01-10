@@ -207,7 +207,11 @@ class ImageUploadHandler:
             if not headers:
                 self.create_response(400, {'error': 'Header does not contain required detail'})
 
+            logger.info(f"event: {event}")
+            logger.info(f"event dict: {event.__dict__}")
+
             body = event['body']
+            logger.info(f"body: {body}")
             # TODO: auth check with token against DB
 
             files = event['files']
