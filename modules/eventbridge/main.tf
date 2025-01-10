@@ -2,12 +2,12 @@
 
 locals {
   processors = {
-    lambda-blur-model               = blur_model_processing
-    lambda-colors-model             = colors_model_processing
-    lambda-image-comparison-model   = image_comparison_model_processing
-    lambda-facial-recognition-model = facial_recognition_model_processing
-    lambda-feature-extraction-model = feature_extraction_model_processing
-    eks-image-classification-model  = image_classification_model_processing
+    lambda-blur-model               = "blur_model_processing"
+    lambda-colors-model             = "colors_model_processing"
+    lambda-image-comparison-model   = "image_comparison_model_processing"
+    lambda-facial-recognition-model = "facial_recognition_model_processing"
+    lambda-feature-extraction-model = "feature_extraction_model_processing"
+    eks-image-classification-model  = "image_classification_model_processing"
   }
 }
 

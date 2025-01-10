@@ -133,7 +133,7 @@ module "sqs" {
 
 
   # Optional: Module-specific configurations
-  module_specific_config = {
+  model_specific_config = {
     "lambda-module1" = {
       visibility_timeout = 600 # 10 minutes for longer processing
       max_receive_count  = 5
