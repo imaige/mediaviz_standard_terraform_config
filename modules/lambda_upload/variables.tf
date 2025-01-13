@@ -63,3 +63,23 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "aurora_cluster_arn" {
+  description = "ARN of the Aurora Serverless cluster"
+  type        = string
+}
+
+variable "aurora_secret_arn" {
+  description = "ARN of the Aurora Serverless secret in Secrets Manager"
+  type        = string
+}
+
+variable "aurora_database_name" {
+  description = "Name of the Aurora database"
+  type        = string
+}
+
+variable "aurora_kms_key_arn" {
+  description = "ARN of the KMS key used for Aurora encryption"
+  type        = string
+}

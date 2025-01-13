@@ -56,6 +56,11 @@ module "lambda_upload" {
   kms_key_arn = module.security.kms_key_arn
   kms_key_id  = module.security.kms_key_id
 
+  aurora_cluster_arn  = module.aurora.cluster_arn
+  aurora_secret_arn   = module.aurora.secret_arn
+  aurora_database_name = module.aurora.database_name
+  aurora_kms_key_arn = module.aurora.kms_key_arn
+
   tags = var.tags
 }
 
