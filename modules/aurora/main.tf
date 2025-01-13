@@ -143,7 +143,7 @@ resource "aws_rds_cluster" "aurora" {
   preferred_maintenance_window = var.maintenance_window
   
   # Enable Data API
-#   enable_http_endpoint = true
+  enable_http_endpoint = true
 
   # Use custom parameter group
   db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.aurora.name

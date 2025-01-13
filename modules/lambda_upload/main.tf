@@ -1,5 +1,3 @@
-# lambda_upload/main.tf
-
 locals {
   # Normalize tags to lowercase to prevent case-sensitivity issues
   normalized_tags = merge(
@@ -36,7 +34,10 @@ resource "aws_lambda_function" "image_upload" {
 
   environment {
     variables = {
-      BUCKET_NAME = var.s3_bucket_name
+      BUCKET_NAME        = var.s3_bucket_name
+      DB_SECRET_ARN     = var.aurora_secret_arn    # Add this
+      DB_CLUSTER_ARN    = var.aurora_cluster_arn   # Add this
+      DB_NAME           = var.aurora_database_name  # Add this
     }
   }
 
@@ -169,6 +170,35 @@ resource "aws_iam_role" "lambda_role" {
 #   })
 }
 
+resource "aws_iam_role_policy" "lambda_rds_policy" {
+  name = "${var.project_name}-${var.env}-lambda-rds-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:CommitTransaction",
+          "rds-data:RollbackTransaction"
+        ]
+        Resource = var.aurora_cluster_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = var.aurora_secret_arn
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -185,9 +215,16 @@ resource "aws_iam_role_policy" "lambda_s3_policy" {
         Effect = "Allow"
         Action = [
           "s3:PutObject",
-          "s3:PutObjectAcl"
+          "s3:PutObjectAcl",
+          "s3:GetObject",
+          "s3:GetObjectAcl",
+          "s3:ListBucket",
+          "s3:DeleteObject"
         ]
-        Resource = "${var.s3_bucket_arn}/*"
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
+        ]
       }
     ]
   })
@@ -233,4 +270,23 @@ resource "aws_iam_role_policy" "lambda_dlq_policy" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_kms_policy" {
+  name = "${var.project_name}-${var.env}-lambda-kms-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = var.aurora_kms_key_arn  # You'll need to pass this from your Aurora module
+      }
+    ]
+  })
 }
