@@ -230,3 +230,26 @@ module "ecr" {
   
   tags = var.tags
 }
+
+module "eks_processors" {
+  source = "./../../modules/eks_processors"
+
+  project_name = var.project_name
+  env          = var.env
+  aws_region   = var.aws_region
+
+  namespace     = "default"
+  chart_version = "0.1.0"
+  replicas      = 1
+
+  sqs_queues = {
+    "facial-recognition-model"    = module.sqs.eks_queue_arns["eks-facial-recognition-model"]
+    "image-classification-model"  = module.sqs.eks_queue_arns["eks-image-classification-model"]
+  }
+
+  kms_key_arn       = module.security.kms_key_arn
+  oidc_provider     = module.eks.oidc_provider
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  tags = var.tags
+}

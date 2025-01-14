@@ -1,8 +1,8 @@
 # sqs/main.tf
 
 locals {
-  lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model" ]
-  eks_models    = ["eks-image-classification-model"]
+  lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model"]
+  eks_models    = ["eks-image-classification-model", "eks-facial-recognition-model"]  # Added facial recognition model
   all_models    = concat(local.lambda_models, local.eks_models)
   
   # Normalize tags to lowercase to prevent case-sensitivity issues
