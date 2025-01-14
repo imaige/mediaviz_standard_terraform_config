@@ -204,3 +204,31 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 
   function_response_types = ["ReportBatchItemFailures"]
 }
+
+# S3 access policy
+# S3 access policy for all buckets
+resource "aws_iam_role_policy" "s3_policy" {
+  for_each = toset(local.lambda_functions)
+
+  name = "${var.project_name}-${var.env}-${each.key}-s3-policy"
+  role = aws_iam_role.processor_role[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion",
+          "s3:ListAllMyBuckets"
+        ]
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
+        ]
+      }
+    ]
+  })
+}

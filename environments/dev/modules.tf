@@ -103,11 +103,11 @@ module "eventbridge" {
   env          = var.env
 
   sqs_queues = {
-    l-blur-model                  = module.sqs.lambda_queue_arns["l-blur-model"]
-    l-colors-model                = module.sqs.lambda_queue_arns["l-colors-model"]
-    l-image-comparison-model      = module.sqs.lambda_queue_arns["l-image-comparison-model"]
-    l-facial-recognition-model    = module.sqs.lambda_queue_arns["l-facial-recognition-model"]
-    l-feature-extraction-model    = module.sqs.lambda_queue_arns["l-feature-extraction-mode"]
+    l-blur-model                  = module.sqs.lambda_queue_arns["lambda-blur-model"]
+    l-colors-model                = module.sqs.lambda_queue_arns["lambda-colors-model"]
+    l-image-comparison-model      = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
+    l-facial-recognition-model    = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
+    l-feature-extraction-model    = module.sqs.lambda_queue_arns["lambda-feature-extraction-model"]
     eks-img-classification-model  = module.sqs.eks_queue_arns["eks-image-classification-model"]
   }
 
