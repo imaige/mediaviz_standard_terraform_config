@@ -83,7 +83,6 @@ module "lambda_processors" {
     l-colors-model             = module.sqs.lambda_queue_arns["lambda-colors-model"]
     l-image-comparison-model   = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
     l-facial-recognition-model = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
-    l-feature-extraction-model = module.sqs.lambda_queue_arns["lambda-feature-extraction-model"]
   }
   dlq_arn = module.sqs.dlq_arn
 
@@ -119,7 +118,6 @@ module "eventbridge" {
     l-colors-model                = module.sqs.lambda_queue_arns["lambda-colors-model"]
     l-image-comparison-model      = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
     l-facial-recognition-model    = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
-    l-feature-extraction-model    = module.sqs.lambda_queue_arns["lambda-feature-extraction-model"]
     eks-img-classification-model  = module.sqs.eks_queue_arns["eks-image-classification-model"]
   }
 
@@ -181,23 +179,7 @@ module "security" {
 
 module "eks_functions" {
   source    = "./../../modules/eks_functions"
-  models    = ["model1", "model2", "model3"]
-  prefix    = "myapp"
-  namespace = "default"
-  replicas  = 3
-  sqs_urls = [
-    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel1Queue",
-    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel2Queue",
-    "https://sqs.us-east-2.amazonaws.com/123456789012/EKSModel3Queue"
-  ]
-  sqs_arns = [
-    "arn:aws:sqs:us-east-2:123456789012:EKSModel1Queue",
-    "arn:aws:sqs:us-east-2:123456789012:EKSModel2Queue",
-    "arn:aws:sqs:us-east-2:123456789012:EKSModel3Queue"
-  ]
-  aws_region           = "us-west-2"
-  image_tags           = ["latest", "latest", "latest"]
-  service_account_name = "eks-service-account"
+
 }
 
 module "aurora" {
