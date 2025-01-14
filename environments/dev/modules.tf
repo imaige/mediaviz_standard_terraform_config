@@ -72,10 +72,22 @@ module "lambda_processors" {
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
+  
+  # ECR configurations 
+  ecr_repository_url = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.env}"
+  ecr_repository_arns = values(module.ecr.repository_arns)
 
-  sqs_queue_arn = module.sqs.queue_arn
-  dlq_arn       = module.sqs.dlq_arn
+  # SQS configurations - use the map of queue ARNs
+  sqs_queues = {
+    l-blur-model               = module.sqs.lambda_queue_arns["lambda-blur-model"]
+    l-colors-model             = module.sqs.lambda_queue_arns["lambda-colors-model"]
+    l-image-comparison-model   = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
+    l-facial-recognition-model = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
+    l-feature-extraction-model = module.sqs.lambda_queue_arns["lambda-feature-extraction-model"]
+  }
+  dlq_arn = module.sqs.dlq_arn
 
+  # Aurora configurations
   aurora_cluster_arn       = module.aurora.cluster_arn
   aurora_secret_arn        = module.aurora.secret_arn
   aurora_database_name     = module.aurora.database_name
@@ -223,4 +235,16 @@ module "bastion" {
   ]
   aurora_endpoint = module.aurora.cluster_endpoint
   tags            = var.tags
+}
+
+module "ecr" {
+  source = "./../../modules/ecr"
+
+  project_name = var.project_name
+  env          = var.env
+  kms_key_arn  = module.security.kms_key_arn
+  
+  cross_account_arns = []  # Add any cross-account ARNs if needed
+  
+  tags = var.tags
 }

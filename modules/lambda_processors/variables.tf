@@ -38,11 +38,6 @@ variable "private_subnet_ids" {
   description = "List of private subnet IDs"
 }
 
-variable "sqs_queue_arn" {
-  type        = string
-  description = "ARN of the SQS queue"
-}
-
 variable "dlq_arn" {
   type        = string
   description = "ARN of the Dead Letter Queue"
@@ -72,4 +67,19 @@ variable "tags" {
   type        = map(string)
   description = "Additional tags for resources"
   default     = {}
+}
+
+variable "ecr_repository_url" {
+  type        = string
+  description = "Base URL for ECR repositories"
+}
+
+variable "ecr_repository_arns" {
+  type        = list(string)
+  description = "List of ECR repository ARNs"
+}
+
+variable "sqs_queues" {
+  type        = map(string)
+  description = "Map of SQS queue ARNs for each lambda function"
 }

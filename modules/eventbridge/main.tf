@@ -38,11 +38,10 @@ resource "aws_cloudwatch_event_rule" "processing_rules" {
   description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
-    source      = ["custom.imageUpload"] // does this need update?
+    source      = ["custom.imageUpload"]
     detail-type = [each.value]
     detail = {
-      version        = ["1.0"]
-      processingType = [each.key]
+      version = ["1.0"]
     }
   })
 
