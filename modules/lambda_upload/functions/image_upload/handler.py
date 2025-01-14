@@ -4,7 +4,7 @@ import uuid
 import time
 import os
 import boto3
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from botocore.exceptions import ClientError
 from botocore.config import Config
 from datetime import datetime
@@ -31,21 +31,36 @@ class ImageUploadHandler:
     def extract_and_validate_header_photo_details(self, event: Dict[str, Any]) -> Optional[Dict]:
         """Extract client_id from event headers or query parameters."""
         if 'headers' in event:
+            headers = event.get('headers', {})
             if 'x-bucket-name' in event['headers'] and 'x-file-name' in event['headers']:
                 return {
-                    'bucket-name': event['headers']['x-bucket-name'],
-                    'file-name': event['headers']['x-file-name']
+                    'bucket_name': headers.get('x-bucket-name'),
+                    'file_name': headers.get('x-file-name'),
+                    'models': headers.get('x-models'),
+                    'company_id': headers.get('x-company-id'),
+                    'user_id': headers.get('x-user-id'),
+                    'project_table_name': headers.get('x-project-table-name'),
+                    'client_side_id': headers.get('x-client-side-id'),
+                    'title': headers.get('x-title'),
+                    'description': headers.get('x-description'),
+                    'format': headers.get('x-format'),
+                    'size': headers.get('x-size'),
+                    'source_resolution_x': headers.get('x-source-resolution-x'),
+                    'source_resolution_y': headers.get('x-source-resolution-y'),
+                    'date_taken': headers.get('x-date-taken'),
+                    'latitude': headers.get('x-latitude'),
+                    'longitude': headers.get('x-longitude'),
                 }
             else:
                 return None
-        elif 'queryStringParameters' in event and event['queryStringParameters']:
-            if 'bucket_name' in event['queryStringParameters'] and 'file_name' in event['queryStringParameters']:
-                return {
-                    'bucket-name': event['queryStringParameters']['bucket_name'],
-                    'file-name': event['queryStringParameters']['file_name']
-                }
-            else:
-                return None
+        # elif 'queryStringParameters' in event and event['queryStringParameters']:
+        #     if 'bucket_name' in event['queryStringParameters'] and 'file_name' in event['queryStringParameters']:
+        #         return {
+        #             'bucket-name': event['queryStringParameters']['bucket_name'],
+        #             'file-name': event['queryStringParameters']['file_name']
+        #         }
+        #     else:
+        #         return None
         return None
 
     def create_response(self, status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -59,14 +74,21 @@ class ImageUploadHandler:
             'body': json.dumps(body)
         }
         
-    def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str) -> bool:
+    def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str, content_type: str) -> bool:
         """Upload file to S3 with metadata."""
         try:
+            content_type = ''
+            if content_type.lower() in ['jpg', 'jpeg']:
+                content_type = 'image/jpeg'
+            elif content_type.lower() == 'png':
+                content_type = 'image/png'
+            elif content_type.lower() == 'heic':
+                content_type = 'image/heic'
             self.s3_client.put_object(
                 Bucket=bucket_name,
                 Key=file_path,
                 Body=file_content,
-                ContentType='image/jpeg'
+                ContentType=content_type
             )
             return True
         except ClientError as e:
@@ -80,43 +102,61 @@ class ImageUploadHandler:
             company_id: int,
             photo_s3_link: str,
             project_table_name: str,
-            client_side_id: str,
-            file_path: str,
-            title: str,
-            description: str,
-            format: str,
-            size: int,
-            source_resolution_x: int,
-            source_resolution_y: int,
-            date_taken: str,
-            latitude: float,
-            longitude: float,
+            client_side_id: Union[str, None],
+            file_path: Union[str, None],
+            title: Union[str, None],
+            description: Union[str, None],
+            format: Union[str, None],
+            size: Union[int, None],
+            source_resolution_x: Union[int, None],
+            source_resolution_y: Union[int, None],
+            date_taken: Union[str, None],
+            latitude: Union[float, None],
+            longitude: Union[float, None],
     ) -> int:
-        date_taken_converted = convert_to_postgres_date(date_taken) if date_taken is not None else None
+        # date_taken_converted = convert_to_postgres_date(date_taken) if date_taken is not None else None
         response = self.rds_client.execute_statement(
             resourceArn=os.environ['DB_CLUSTER_ARN'],
             secretArn=os.environ['DB_SECRET_ARN'],
             database=os.environ['DB_NAME'],
             sql='''
                 INSERT INTO 
-                    photos
-                VALUES 
-                    user_id, 
-                    company_id, 
-                    photo_s3_link,
-                    project_table_name,
-                    client_side_id,
-                    file_path,
-                    title, 
-                    description,
-                    format,
-                    size,
-                    source_resolution_x, 
-                    source_resolution_y, 
-                    date_taken, 
-                    date_uploaded,
-                    latitude, 
-                    longitude 
+                    photos (
+                        user_id, 
+                        company_id, 
+                        photo_s3_link, 
+                        project_table_name, 
+                        client_side_id, 
+                        file_path, 
+                        title, 
+                        description, 
+                        format, 
+                        size, 
+                        source_resolution_x, 
+                        source_resolution_y, 
+                        date_taken, 
+                        date_uploaded, 
+                        latitude, 
+                        longitude
+                    )
+                VALUES (
+                    :user_id, 
+                    :company_id, 
+                    :photo_s3_link, 
+                    :project_table_name, 
+                    :client_side_id, 
+                    :file_path, 
+                    :title, 
+                    :description, 
+                    :format, 
+                    :size, 
+                    :source_resolution_x, 
+                    :source_resolution_y, 
+                    CAST(:date_taken AS TIMESTAMP), 
+                    CAST(:date_uploaded AS TIMESTAMP), 
+                    :latitude, 
+                    :longitude
+                )
                 RETURNING
                     id
                 ''',
@@ -125,18 +165,18 @@ class ImageUploadHandler:
                 {'name': 'company_id', 'value': {'longValue': company_id}},
                 {'name': 'photo_s3_link', 'value': {'stringValue': photo_s3_link}},
                 {'name': 'project_table_name', 'value': {'stringValue': project_table_name}},
-                {'name': 'client_side_id', 'value': {'stringValue': client_side_id if client_side_id else None}},
-                {'name': 'file_path', 'value': {'stringValue': file_path if file_path else None}},
-                {'name': 'title', 'value': {'stringValue': title if title else None}},
-                {'name': 'description', 'value': {'stringValue': description if description else None}},
-                {'name': 'format', 'value': {'stringValue': format if format else None}},
-                {'name': 'size', 'value': {'longValue': size if size else None}},
-                {'name': 'source_resolution_x', 'value': {'longValue': source_resolution_x if source_resolution_x else None}},
-                {'name': 'source_resolution_y', 'value': {'longValue': source_resolution_y if source_resolution_y else None}},
-                {'name': 'date_taken', 'value': {'stringValue': date_taken_converted}},  # handling of None done above
-                {'name': 'date_uploaded', 'value': {'stringValue': datetime.now()}},
-                {'name': 'latitude', 'value': {'doubleValue': latitude if latitude else None}},
-                {'name': 'longitude', 'value': {'doubleValue': longitude if longitude else None}},
+                {'name': 'client_side_id', 'value': {'stringValue': client_side_id} if client_side_id else {'isNull': True}},
+                {'name': 'file_path', 'value': {'stringValue': file_path} if file_path else {'isNull': True}},
+                {'name': 'title', 'value': {'stringValue': title} if title else {'isNull': True}},
+                {'name': 'description', 'value': {'stringValue': description} if description else {'isNull': True}},
+                {'name': 'format', 'value': {'stringValue': format} if format else {'isNull': True}},
+                {'name': 'size', 'value': {'longValue': size} if size else {'isNull': True}},
+                {'name': 'source_resolution_x', 'value': {'longValue': source_resolution_x} if source_resolution_x else {'isNull': True}},
+                {'name': 'source_resolution_y', 'value': {'longValue': source_resolution_y} if source_resolution_y else {'isNull': True}},
+                {'name': 'date_taken', 'value': {'stringValue': date_taken} if date_taken else {'isNull': True}},  # handling of None done above
+                {'name': 'date_uploaded', 'value': {'stringValue': datetime.now().isoformat()}},
+                {'name': 'latitude', 'value': {'doubleValue': latitude} if latitude else {'isNull': True}},
+                {'name': 'longitude', 'value': {'doubleValue': longitude} if longitude else {'isNull': True}},
             ]
         )
         if response['records']:
@@ -148,7 +188,7 @@ class ImageUploadHandler:
             logger.error(f"Error generating record for photo from request {request_id} for client {company_id}")
 
 
-    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, photo_id: int, photo_s3_url: str, models: List[str], timestamp) -> bool:
+    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, photo_id: int, photo_s3_url: str, models: str, timestamp) -> bool:
         """Send processing events to EventBridge."""
         try:
             # Prepare common event details
@@ -172,11 +212,13 @@ class ImageUploadHandler:
                 'EventBusName': 'default'
             }
 
-            # TODO: why are we registering this upload as an event? this lambda's trigger is a s3.put_object so that is already there
             events = [main_event]
 
+            models_parsed = models.split(",")
+
             # Send events for each processing model
-            for model_name in models:
+            for model_name in models_parsed:
+                logger.info(f"creating event for model {model_name} for photo {photo_id}")
                 event = {
                     'Source': 'custom.imageUpload',
                     'DetailType': f"{model_name}_processing",
@@ -189,6 +231,7 @@ class ImageUploadHandler:
                 events.append(event)
 
             # Send all events in a single batch
+            logger.info(f"publishing events for photo {photo_id}")
             self.eventbridge_client.put_events(Entries=events)
             return True
             
@@ -207,17 +250,19 @@ class ImageUploadHandler:
             if not headers:
                 self.create_response(400, {'error': 'Header does not contain required detail'})
 
-            logger.info(f"event: {event}")
-            logger.info(f"event dict: {event.__dict__}")
+            logger.info(f"headers: {headers}")
 
-            body = event['body']
-            logger.info(f"body: {body}")
             # TODO: auth check with token against DB
 
-            files = event['files']
-            photo_encoded = files.get("image_data_encoded")
+            # photo_encoded = event['body']
+            body = json.loads(event['body'])
+            # Extract fields
+            base64_content = body.get('file_content')
+            filename = body.get('filename', 'unknown')
+            mimetype = body.get('mimetype', 'application/octet-stream')
             try:
-                file_content = base64.b64decode(photo_encoded)
+                # file_content = base64.b64decode(photo_encoded)
+                file_content = base64.b64decode(base64_content)
             except Exception as e:
                 logger.error(f"Exception decoding file: {e}")
                 return self.create_response(400, {'error': 'Invalid file content'})
@@ -231,27 +276,28 @@ class ImageUploadHandler:
 
             # Generate file path
             file_path = f"uploads/{file_name}"
+            logger.info(f"file_path is: {file_path}")
             s3_url = f"https://{bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
+            logger.info(f"s3_url: {s3_url}")
 
             # Extract required fields from body
             # TODO: crystallize request format for request/EventBridge event/S3 photo publish that the frontend will use
-            models = body.get("models")
-            bucket_name = body.get("bucket_name")
-            user_id = body.get("user_id")
-            company_id = body.get("company_id")
+            models = headers.get("models")
+            bucket_name = headers.get("bucket_name")
+            user_id = headers.get("user_id")
+            company_id = headers.get("company_id")
             photo_s3_link = s3_url
-            project_table_name = body.get("project_table_name")
-            client_side_id = body.get("client_side_id", None)
-            file_path = body.get("file_path", None)
-            title = body.get("title", None)
-            description = body.get("description", None)
-            format = body.get("format", None)
-            size = body.get("size", None)
-            source_resolution_x = body.get("source_resolution_x", None)
-            source_resolution_y = body.get("source_resolution_y", None)
-            date_taken = body.get("date_taken", None)
-            latitude = body.get("latitude", None)
-            longitude = body.get("longitude", None)
+            project_table_name = headers.get("project_table_name")
+            client_side_id = headers.get("client_side_id", None)
+            title = headers.get("title", None)
+            description = headers.get("description", None)
+            format = headers.get("format", None)
+            size = headers.get("size", None)
+            source_resolution_x = headers.get("source_resolution_x", None)
+            source_resolution_y = headers.get("source_resolution_y", None)
+            date_taken = headers.get("date_taken", None)
+            latitude = headers.get("latitude", None)
+            longitude = headers.get("longitude", None)
 
             # TODO: validate company_id and user_id against DB
 
@@ -262,8 +308,8 @@ class ImageUploadHandler:
             # insert into database returning ID for push to future events
             photo_id = self.insert_photo_to_database(
                 request_id,
-                user_id,
-                company_id,
+                int(user_id),
+                int(company_id),
                 photo_s3_link,
                 project_table_name,
                 client_side_id,
@@ -271,17 +317,17 @@ class ImageUploadHandler:
                 title,
                 description,
                 format,
-                size,
-                source_resolution_x,
-                source_resolution_y,
+                int(size) if size else None,
+                int(source_resolution_x) if source_resolution_x else None,
+                int(source_resolution_y) if source_resolution_y else None,
                 date_taken,
-                latitude,
-                longitude
+                float(latitude) if latitude else None,
+                float(longitude) if longitude else None
             )
 
             # Upload to S3
             # TODO: add retry logic
-            if not self.upload_to_s3(file_content, file_path, bucket_name):
+            if not self.upload_to_s3(file_content, file_path, bucket_name, mimetype):
                 return self.create_response(500, {'error': f'Failed to upload file for photo {photo_id}'})
 
             # Send events to EventBridge - retry handled by DLQ
