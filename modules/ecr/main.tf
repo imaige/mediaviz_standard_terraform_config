@@ -61,8 +61,10 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
 data "aws_iam_policy_document" "lambda_repos" {
   for_each = toset(local.repositories)
 
+  version = "2012-10-17"
+
   statement {
-    sid    = "LambdaECRImageRetrievalPolicy"
+    sid    = "AllowLambdaAccess"
     effect = "Allow"
 
     principals {
@@ -70,29 +72,29 @@ data "aws_iam_policy_document" "lambda_repos" {
       identifiers = ["lambda.amazonaws.com"]
     }
 
-    actions = [
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer"
-    ]
-  }
-
-  statement {
-    sid    = "AllowCrossAccountPull"
-    effect = "Allow"
-
     principals {
       type = "AWS"
-      identifiers = var.cross_account_arns
+      identifiers = concat(
+        ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"],
+        var.cross_account_arns
+      )
     }
 
     actions = [
+      "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer"
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:PutImage",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload"
     ]
   }
 }
 
-# Apply repository policy
+# Add data source for current account ID
+data "aws_caller_identity" "current" {}
+
 resource "aws_ecr_repository_policy" "lambda_repos" {
   for_each = toset(local.repositories)
 

@@ -62,9 +62,9 @@ variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
   default = {
-    Environment = "dev"
-    Terraform   = "true"
-    Project     = "mediaviz"
+    environment = "dev"
+    terraform   = "true"
+    project     = "mediaviz"
   }
 }
 

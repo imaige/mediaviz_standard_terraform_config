@@ -8,18 +8,13 @@ locals {
     "l-facial-recognition-model" = "face_recognition_model_processing"
     "l-feature-extraction-model" = "feature_extract_model_processing"
   }
-  
-  normalized_tags = {
-    for key, value in var.tags :
-    lower(key) => value
-  }
 }
 
 resource "aws_lambda_function" "processor" {
   for_each = local.lambda_functions
 
   function_name = "${var.project_name}-${var.env}-${each.key}"
-  role         = aws_iam_role.processor_role[each.key].arn
+  role         = aws_iam_role.processor_role_new[each.key].arn
   
   package_type = "Image"
   image_uri    = "${var.ecr_repository_url}/${each.key}:latest"
@@ -49,11 +44,20 @@ resource "aws_lambda_function" "processor" {
     mode = "Active"
   }
 
-  tags = merge(local.normalized_tags, {
+  # Use only standard_tags + model
+  tags = {
+    name        = "${var.project_name}-${var.env}-${each.key}"
     environment = var.env
-    model      = each.key
-    terraform  = "true"
-  })
+  }
+
+  lifecycle {
+    create_before_destroy = true
+    replace_triggered_by = [
+      aws_security_group.processor_sg[each.key]
+    ]
+  }
+
+  depends_on = [aws_iam_role.processor_role_new]
 }
 
 resource "aws_security_group" "processor_sg" {
@@ -79,14 +83,19 @@ resource "aws_security_group" "processor_sg" {
     security_groups = [var.aurora_security_group_id]
   }
 
-  tags = merge(local.normalized_tags, {
+  # Use only standard_tags + model
+  tags = {
+    name        = "${var.project_name}-${var.env}-${each.key}"
     environment = var.env
-    model      = each.key
-    terraform  = "true"
-  })
+  }
+
+  # Add lifecycle policy to help with deletion
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-resource "aws_iam_role" "processor_role" {
+resource "aws_iam_role" "processor_role_new" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-role"
@@ -102,24 +111,23 @@ resource "aws_iam_role" "processor_role" {
     }]
   })
 
-  tags = merge(local.normalized_tags, {
-    environment = var.env
-    model      = each.key
-    terraform  = "true"
-  })
+  # tags = {
+  #   name        = "${var.project_name}-${var.env}-${each.key}"
+  #   environment = var.env
+  # }
 }
 
 resource "aws_iam_role_policy_attachment" "basic_execution" {
   for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role[each.key].name
+  role       = aws_iam_role.processor_role_new[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "vpc_access" {
   for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role[each.key].name
+  role       = aws_iam_role.processor_role_new[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
@@ -127,7 +135,7 @@ resource "aws_iam_role_policy" "sqs_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-sqs-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -158,7 +166,7 @@ resource "aws_iam_role_policy" "aurora_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-aurora-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -189,7 +197,7 @@ resource "aws_iam_role_policy" "ecr_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-ecr-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -211,7 +219,7 @@ resource "aws_iam_role_policy" "s3_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-s3-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -246,33 +254,4 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   }
 
   function_response_types = ["ReportBatchItemFailures"]
-}
-
-# Outputs
-output "function_arns" {
-  description = "ARNs of the Lambda functions"
-  value = {
-    for k, v in aws_lambda_function.processor : k => v.arn
-  }
-}
-
-output "function_names" {
-  description = "Names of the Lambda functions"
-  value = {
-    for k, v in aws_lambda_function.processor : k => v.function_name
-  }
-}
-
-output "role_arns" {
-  description = "ARNs of the IAM roles"
-  value = {
-    for k, v in aws_iam_role.processor_role : k => v.arn
-  }
-}
-
-output "security_group_ids" {
-  description = "IDs of the security groups"
-  value = {
-    for k, v in aws_security_group.processor_sg : k => v.id
-  }
 }
