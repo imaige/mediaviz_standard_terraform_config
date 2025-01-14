@@ -6,7 +6,7 @@ locals {
     "l-colors-model"               = "colors_model_processing"
     "l-image-comparison-model"     = "image_comparison_model_processing"
     "l-facial-recognition-model"   = "face_recognition_model_processing"
-    "l-feature-extraction-model"   = "feature_extract_model_processing"
+
     "eks-img-classification-model" = "img_classification_model_processing"
   }
 }

@@ -6,7 +6,7 @@ locals {
     "l-colors-model",
     "l-image-comparison-model", 
     "l-facial-recognition-model",
-    "l-feature-extraction-model"
+
   ]
 }
 

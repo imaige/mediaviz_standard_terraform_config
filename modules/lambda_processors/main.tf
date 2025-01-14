@@ -6,7 +6,7 @@ locals {
     "l-colors-model"             = "colors_model_processing"
     "l-image-comparison-model"   = "image_comparison_model_processing"
     "l-facial-recognition-model" = "face_recognition_model_processing"
-    "l-feature-extraction-model" = "feature_extract_model_processing"
+
   }
 }
 
@@ -17,7 +17,7 @@ resource "aws_lambda_function" "processor" {
   role         = aws_iam_role.processor_role_new[each.key].arn
   
   package_type = "Image"
-  image_uri    = "${var.ecr_repository_url}/${each.key}:latest"
+  image_uri    = "${var.ecr_repository_url}-${each.key}:latest"
 
   memory_size = var.memory_size
   timeout     = var.timeout
