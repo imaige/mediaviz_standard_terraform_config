@@ -255,3 +255,23 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 
   function_response_types = ["ReportBatchItemFailures"]
 }
+
+resource "aws_iam_role_policy" "rekognition_policy" {
+  for_each = local.lambda_functions
+
+  name = "${var.project_name}-${var.env}-${each.key}-rekognition-policy"
+  role = aws_iam_role.processor_role_new[each.key].id  # Changed from processor_role to processor_role_new
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rekognition:DetectFaces"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}

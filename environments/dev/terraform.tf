@@ -1,7 +1,4 @@
 terraform {
-  # required_version = "1.9.7"
-
-  # where to store state files
   backend "s3" {
     bucket         = "mediaviz-terraform-backend-config-dev"
     key            = "terraform.tfstate"
@@ -10,7 +7,6 @@ terraform {
     encrypt        = true
   }
 
-  # cloud providers
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -19,6 +15,10 @@ terraform {
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17.0"  # Updated version
     }
     time = {
       source  = "hashicorp/time"
@@ -49,6 +49,19 @@ provider "kubernetes" {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
     args        = ["eks", "get-token", "--cluster-name", "${var.cluster_name}-${var.env}-cluster"]
+  }
+}
+
+provider "helm" {                         # Add this provider
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", "${var.cluster_name}-${var.env}-cluster"]
+    }
   }
 }
 

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: eks-processor
+description: A Helm chart for EKS ML Processors
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
