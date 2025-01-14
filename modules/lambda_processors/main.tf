@@ -1,33 +1,26 @@
 # lambda_processors/main.tf
 
 locals {
-  lambda_functions = ["module1", "module2", "module3"]
-  
-  # Normalize tags to lowercase to prevent case-sensitivity issues
-  normalized_tags = {
-    for key, value in var.tags :
-    lower(key) => value
+  lambda_functions = {
+    "l-blur-model"               = "blur_model_processing"
+    "l-colors-model"             = "colors_model_processing"
+    "l-image-comparison-model"   = "image_comparison_model_processing"
+    "l-facial-recognition-model" = "face_recognition_model_processing"
+    "l-feature-extraction-model" = "feature_extract_model_processing"
   }
 }
 
-data "archive_file" "processor_package" {
-  for_each = toset(local.lambda_functions)
-
-  type        = "zip"
-  source_dir  = "${path.module}/functions/${each.key}"
-  output_path = "${path.module}/dist/${each.key}.zip"
-}
-
 resource "aws_lambda_function" "processor" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
-  filename         = data.archive_file.processor_package[each.key].output_path
-  function_name    = "${var.project_name}-${var.env}-${each.key}-processor"
-  role            = aws_iam_role.processor_role[each.key].arn
-  handler         = "handler.handle_processing"
-  runtime         = var.lambda_runtime
-  memory_size     = var.memory_size
-  timeout         = var.timeout
+  function_name = "${var.project_name}-${var.env}-${each.key}"
+  role         = aws_iam_role.processor_role_new[each.key].arn
+  
+  package_type = "Image"
+  image_uri    = "${var.ecr_repository_url}/${each.key}:latest"
+
+  memory_size = var.memory_size
+  timeout     = var.timeout
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -51,17 +44,26 @@ resource "aws_lambda_function" "processor" {
     mode = "Active"
   }
 
-  tags = merge(local.normalized_tags, {
+  # Use only standard_tags + model
+  tags = {
+    name        = "${var.project_name}-${var.env}-${each.key}"
     environment = var.env
-    module      = each.key
-    terraform   = "true"
-  })
+  }
+
+  lifecycle {
+    create_before_destroy = true
+    replace_triggered_by = [
+      aws_security_group.processor_sg[each.key]
+    ]
+  }
+
+  depends_on = [aws_iam_role.processor_role_new]
 }
 
 resource "aws_security_group" "processor_sg" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
-  name        = "${var.project_name}-${var.env}-${each.key}-processor-sg"
+  name        = "${var.project_name}-${var.env}-${each.key}-sg"
   description = "Security group for ${each.key} Lambda processor"
   vpc_id      = var.vpc_id
 
@@ -74,24 +76,29 @@ resource "aws_security_group" "processor_sg" {
   }
 
   egress {
-    description = "Aurora access"
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
+    description     = "Aurora access"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
     security_groups = [var.aurora_security_group_id]
   }
 
-  tags = merge(local.normalized_tags, {
+  # Use only standard_tags + model
+  tags = {
+    name        = "${var.project_name}-${var.env}-${each.key}"
     environment = var.env
-    module      = each.key
-    terraform   = "true"
-  })
+  }
+
+  # Add lifecycle policy to help with deletion
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-resource "aws_iam_role" "processor_role" {
-  for_each = toset(local.lambda_functions)
+resource "aws_iam_role" "processor_role_new" {
+  for_each = local.lambda_functions
 
-  name = "${var.project_name}-${var.env}-${each.key}-processor-role"
+  name = "${var.project_name}-${var.env}-${each.key}-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -104,33 +111,31 @@ resource "aws_iam_role" "processor_role" {
     }]
   })
 
-  tags = merge(local.normalized_tags, {
-    environment = var.env
-    module      = each.key
-    terraform   = "true"
-  })
+  # tags = {
+  #   name        = "${var.project_name}-${var.env}-${each.key}"
+  #   environment = var.env
+  # }
 }
 
 resource "aws_iam_role_policy_attachment" "basic_execution" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role[each.key].name
+  role       = aws_iam_role.processor_role_new[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "vpc_access" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role[each.key].name
+  role       = aws_iam_role.processor_role_new[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-# SQS processing policy
 resource "aws_iam_role_policy" "sqs_policy" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-sqs-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -143,7 +148,7 @@ resource "aws_iam_role_policy" "sqs_policy" {
           "sqs:GetQueueAttributes",
           "sqs:ChangeMessageVisibility"
         ]
-        Resource = var.sqs_queue_arn
+        Resource = var.sqs_queues[each.key]  # Changed from var.sqs_queue_arn
       },
       {
         Effect = "Allow"
@@ -157,12 +162,11 @@ resource "aws_iam_role_policy" "sqs_policy" {
   })
 }
 
-# Aurora access policy
 resource "aws_iam_role_policy" "aurora_policy" {
-  for_each = toset(local.lambda_functions)
+  for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-aurora-policy"
-  role = aws_iam_role.processor_role[each.key].id
+  role = aws_iam_role.processor_role_new[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -189,11 +193,58 @@ resource "aws_iam_role_policy" "aurora_policy" {
   })
 }
 
-# SQS triggers for Lambda functions
-resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  for_each = toset(local.lambda_functions)
+resource "aws_iam_role_policy" "ecr_policy" {
+  for_each = local.lambda_functions
 
-  event_source_arn = var.sqs_queue_arn
+  name = "${var.project_name}-${var.env}-${each.key}-ecr-policy"
+  role = aws_iam_role.processor_role_new[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability"
+        ]
+        Resource = var.ecr_repository_arns
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "s3_policy" {
+  for_each = local.lambda_functions
+
+  name = "${var.project_name}-${var.env}-${each.key}-s3-policy"
+  role = aws_iam_role.processor_role_new[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion",
+          "s3:ListAllMyBuckets"
+        ]
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  for_each = local.lambda_functions
+
+  event_source_arn = var.sqs_queues[each.key]
   function_name    = aws_lambda_function.processor[each.key].arn
   batch_size       = 1
   maximum_batching_window_in_seconds = 0

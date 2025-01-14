@@ -2,12 +2,12 @@
 
 locals {
   processors = {
-    "l-blur-model"                  = "blur_model_processing"
-    "l-colors-model"                = "colors_model_processing"
-    "l-image-comparison-model"      = "image_comparison_model_processing"
-    "l-facial-recognition-model"    = "face_recognition_model_processing"
-    "l-feature-extraction-model"    = "feature_extract_model_processing"
-    "eks-img-classification-model"  = "img_classification_model_processing"
+    "l-blur-model"                 = "blur_model_processing"
+    "l-colors-model"               = "colors_model_processing"
+    "l-image-comparison-model"     = "image_comparison_model_processing"
+    "l-facial-recognition-model"   = "face_recognition_model_processing"
+    "l-feature-extraction-model"   = "feature_extract_model_processing"
+    "eks-img-classification-model" = "img_classification_model_processing"
   }
 }
 
@@ -38,17 +38,16 @@ resource "aws_cloudwatch_event_rule" "processing_rules" {
   description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
-    source      = ["custom.imageUpload"]  // does this need update?
+    source      = ["custom.imageUpload"]
     detail-type = [each.value]
     detail = {
-      version        = ["1.0"]
-      processingType = [each.key]
+      version = ["1.0"]
     }
   })
 
   tags = merge(var.tags, {
     Environment = var.env
-    Model      = each.key
+    Model       = each.key
     Type        = can(regex("^lambda-", each.key)) ? "lambda" : "eks"
     Terraform   = "true"
   })
@@ -70,12 +69,11 @@ resource "aws_cloudwatch_event_target" "processor_targets" {
       bucket        = "$.detail.bucket"
       photo_s3_link = "$.detail.photo_s3_link"
     }
-    # TODO: update this input_template (and potentially the one below) to take in the photo_id and project_table_name
+
     input_template = <<EOF
 {
   "photo_id": "<photo_id>",
   "bucket": "<bucket>",
-  "key": "<key>",
   "photo_s3_link": "<photo_s3_link>",
   "model": "${each.key}",
   "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",
@@ -112,11 +110,11 @@ resource "aws_cloudwatch_event_target" "fanout_targets" {
       bucket        = "$.detail.bucket"
       photo_s3_link = "$.detail.photo_s3_link"
     }
+
     input_template = <<EOF
 {
   "photo_id": "<photo_id>",
   "bucket": "<bucket>",
-  "key": "<key>",
   "photo_s3_link": "<photo_s3_link>",
   "model": "${each.key}",
   "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",

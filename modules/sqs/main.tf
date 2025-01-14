@@ -116,7 +116,12 @@ resource "aws_sqs_queue_policy" "image_processing" {
         Principal = {
           Service = ["events.amazonaws.com", "lambda.amazonaws.com"]
         }
-        Action = ["sqs:SendMessage"]
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
         Resource = aws_sqs_queue.image_processing.arn
         Condition = {
           ArnLike = {
@@ -128,7 +133,9 @@ resource "aws_sqs_queue_policy" "image_processing" {
         Sid = "DenyNonSSLAccess"
         Effect = "Deny"
         Principal = "*"
-        Action = "*"
+        Action = [
+          "sqs:*"
+        ]
         Resource = aws_sqs_queue.image_processing.arn
         Condition = {
           Bool = {

@@ -44,7 +44,7 @@ variable "eks_managed_node_groups" {
 variable "cluster_version" {
   description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.30"
+  default     = "1.31"
 }
 
 variable "cluster_addons" {
@@ -62,9 +62,9 @@ variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
   default = {
-    Environment = "dev"
-    Terraform   = "true"
-    Project     = "mediaviz"
+    environment = "dev"
+    terraform   = "true"
+    project     = "mediaviz"
   }
 }
 

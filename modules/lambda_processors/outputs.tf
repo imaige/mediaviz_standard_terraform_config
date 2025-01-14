@@ -17,7 +17,7 @@ output "function_names" {
 output "role_arns" {
   description = "Map of function names to their IAM role ARNs"
   value = {
-    for k, v in aws_iam_role.processor_role : k => v.arn
+    for k, v in aws_iam_role.processor_role_new : k => v.arn
   }
 }
 
@@ -36,7 +36,7 @@ output "all_function_arns" {
 
 output "all_role_arns" {
   description = "List of all processor role ARNs"
-  value = values(aws_iam_role.processor_role)[*].arn
+  value = values(aws_iam_role.processor_role_new)[*].arn
 }
 
 output "all_security_group_ids" {
