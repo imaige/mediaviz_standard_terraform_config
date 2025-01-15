@@ -80,6 +80,45 @@ module "eks" {
         }
       }
     }
+
+  gpu_node_group = {
+  ami_type       = "AL2_x86_64_GPU"
+  instance_types = ["g4dn.xlarge"]   # GPU instance type
+
+    min_size     = 2
+    max_size     = 5
+    desired_size = 2
+
+    enable_monitoring = true
+    ebs_optimized    = true
+
+  labels = {
+    "node.kubernetes.io/instance-type" = "g4dn.xlarge"
+    "nvidia.com/gpu.present"           = "true"
+    "nvidia.com/gpu.product"           = "Tesla-T4"
+  }
+
+  taints = {
+    dedicated = {
+      key    = "nvidia.com/gpu"
+      value  = "true"
+      effect = "NO_SCHEDULE"
+    }
+  }
+
+    block_device_mappings = {
+      xvda = {
+        device_name = "/dev/xvda"
+        ebs = {
+          volume_size           = 100
+          volume_type          = "gp3"
+          encrypted            = true
+          kms_key_id          = var.kms_key_arn
+          delete_on_termination = true
+        }
+      }
+    }
+  }    
   }
 
   # Enable logging
@@ -96,4 +135,52 @@ resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.cluster_name}-${var.env}-cluster"
   retention_in_days = 365  # Changed from 30 to 365
   # kms_key_id       = var.kms_key_arn
+}
+
+resource "helm_release" "nvidia_device_plugin" {
+  name             = "nvdp"
+  repository       = "https://nvidia.github.io/k8s-device-plugin"
+  chart            = "nvidia-device-plugin"
+  version          = "0.17.0"
+  namespace        = "nvidia-device-plugin"
+  create_namespace = true
+
+  set {
+    name  = "gfd.enabled"
+    value = "true"
+    type  = "string"
+  }
+
+  set {
+    name  = "migStrategy"
+    value = "none"
+  }
+
+  set {
+    name  = "failOnInitError"
+    value = "true"
+    type  = "string"
+  }
+
+  set {
+    name  = "deviceListStrategy"
+    value = "envvar"
+  }
+
+  set {
+    name  = "deviceIDStrategy"
+    value = "uuid"
+  }
+
+  set {
+    name  = "nfd.enabled"
+    value = "true"
+    type  = "string"
+  }
+}
+
+resource "kubernetes_namespace" "gpu_resources" {
+  metadata {
+    name = "gpu-resources"
+  }
 }

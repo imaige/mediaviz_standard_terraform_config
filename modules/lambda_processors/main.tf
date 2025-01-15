@@ -185,9 +185,13 @@ resource "aws_iam_role_policy" "aurora_policy" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue"
+          "secretsmanager:GetSecretValue",
+          "kms:Decrypt"
         ]
-        Resource = var.aurora_secret_arn
+        Resource = [
+          var.aurora_secret_arn,
+          var.aurora_kms_key_arn  # Add this variable if not already defined
+        ]
       }
     ]
   })
@@ -275,3 +279,4 @@ resource "aws_iam_role_policy" "rekognition_policy" {
     ]
   })
 }
+
