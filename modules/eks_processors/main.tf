@@ -37,6 +37,10 @@ resource "helm_release" "model_deployments" {
   namespace  = var.namespace
   chart      = "${path.module}/chart"
 
+  create_namespace = true  # Add this to ensure namespace exists
+  wait             = true  # Add explicit wait
+  atomic          = true  # Roll back on failure
+
   values = [
     templatefile("${path.module}/chart/values.yaml", {
       image_repository = aws_ecr_repository.model_repos[each.key].repository_url

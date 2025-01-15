@@ -25,7 +25,7 @@ module "eks" {
   aws_account_id     = var.aws_account_id
   kms_key_arn        = module.security.kms_key_arn
   kms_key_id         = module.security.kms_key_id
-  eks_admin_role_arn = module.security.eks_admin_role_arn 
+  eks_admin_role_arn = module.security.eks_admin_role_arn
 }
 
 # New Serverless Infrastructure
@@ -56,10 +56,10 @@ module "lambda_upload" {
   kms_key_arn = module.security.kms_key_arn
   kms_key_id  = module.security.kms_key_id
 
-  aurora_cluster_arn  = module.aurora.cluster_arn
-  aurora_secret_arn   = module.aurora.secret_arn
+  aurora_cluster_arn   = module.aurora.cluster_arn
+  aurora_secret_arn    = module.aurora.secret_arn
   aurora_database_name = module.aurora.database_name
-  aurora_kms_key_arn = module.aurora.kms_key_arn
+  aurora_kms_key_arn   = module.aurora.kms_key_arn
 
   tags = var.tags
 }
@@ -72,9 +72,9 @@ module "lambda_processors" {
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
-  
+
   # ECR configurations 
-  ecr_repository_url = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.env}"
+  ecr_repository_url  = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.env}"
   ecr_repository_arns = values(module.ecr.repository_arns)
 
   # SQS configurations - use the map of queue ARNs
@@ -91,6 +91,7 @@ module "lambda_processors" {
   aurora_secret_arn        = module.aurora.secret_arn
   aurora_database_name     = module.aurora.database_name
   aurora_security_group_id = module.aurora.security_group_id
+  aurora_kms_key_arn       = module.aurora.kms_key_arn
 
   tags = var.tags
 }
@@ -114,11 +115,11 @@ module "eventbridge" {
   env          = var.env
 
   sqs_queues = {
-    l-blur-model                  = module.sqs.lambda_queue_arns["lambda-blur-model"]
-    l-colors-model                = module.sqs.lambda_queue_arns["lambda-colors-model"]
-    l-image-comparison-model      = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
-    l-facial-recognition-model    = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
-    eks-img-classification-model  = module.sqs.eks_queue_arns["eks-image-classification-model"]
+    l-blur-model                 = module.sqs.lambda_queue_arns["lambda-blur-model"]
+    l-colors-model               = module.sqs.lambda_queue_arns["lambda-colors-model"]
+    l-image-comparison-model     = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
+    l-facial-recognition-model   = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
+    eks-img-classification-model = module.sqs.eks_queue_arns["eks-image-classification-model"]
   }
 
   dlq_arn = module.sqs.dlq_arn
@@ -178,7 +179,7 @@ module "security" {
 }
 
 module "eks_functions" {
-  source    = "./../../modules/eks_functions"
+  source = "./../../modules/eks_functions"
 
 }
 
@@ -225,9 +226,9 @@ module "ecr" {
   project_name = var.project_name
   env          = var.env
   kms_key_arn  = module.security.kms_key_arn
-  
-  cross_account_arns = []  # Add any cross-account ARNs if needed
-  
+
+  cross_account_arns = [] # Add any cross-account ARNs if needed
+
   tags = var.tags
 }
 
@@ -243,8 +244,8 @@ module "eks_processors" {
   replicas      = 1
 
   sqs_queues = {
-    "facial-recognition-model"    = module.sqs.eks_queue_arns["eks-facial-recognition-model"]
-    "image-classification-model"  = module.sqs.eks_queue_arns["eks-image-classification-model"]
+    "facial-recognition-model"   = module.sqs.eks_queue_arns["eks-facial-recognition-model"]
+    "image-classification-model" = module.sqs.eks_queue_arns["eks-image-classification-model"]
   }
 
   kms_key_arn       = module.security.kms_key_arn

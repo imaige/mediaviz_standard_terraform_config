@@ -83,3 +83,8 @@ variable "sqs_queues" {
   type        = map(string)
   description = "Map of SQS queue ARNs for each lambda function"
 }
+
+variable "aurora_kms_key_arn" {
+  description = "ARN of the KMS key used to encrypt Aurora secrets"
+  type        = string
+}
