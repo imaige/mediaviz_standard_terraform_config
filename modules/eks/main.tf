@@ -10,22 +10,22 @@ module "eks" {
   control_plane_subnet_ids = var.control_plane_subnet_ids
 
   # Security configurations
-  cluster_endpoint_public_access = true
+  cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
-  enable_irsa = true
+  enable_irsa                     = true
 
   # Authentication configuration
   authentication_mode = "API"
-  
+
   access_entries = {
     # Admin access
     admin = {
       kubernetes_groups = ["cluster-admin"]
-      principal_arn    = var.eks_admin_role_arn
-      type            = "STANDARD"
+      principal_arn     = var.eks_admin_role_arn
+      type              = "STANDARD"
     }
   }
-  
+
   # cluster_encryption_config = {
   #   provider_key_arn = var.kms_key_arn
   #   resources        = ["secrets"]
@@ -66,59 +66,67 @@ module "eks" {
       # Enable EBS optimization
       ebs_optimized = true
 
+      iam_role_additional_policies = {
+        secrets_policy = aws_iam_policy.node_secrets_policy.arn
+      }
+
       # Block device mappings
       block_device_mappings = {
         xvda = {
           device_name = "/dev/xvda"
           ebs = {
             volume_size           = 100
-            volume_type          = "gp3"
-            encrypted            = true
-            kms_key_id          = var.kms_key_arn
+            volume_type           = "gp3"
+            encrypted             = true
+            kms_key_id            = var.kms_key_arn
             delete_on_termination = true
           }
         }
       }
     }
 
-  gpu_node_group = {
-  ami_type       = "AL2_x86_64_GPU"
-  instance_types = ["g4dn.xlarge"]   # GPU instance type
+    gpu_node_group = {
+      ami_type       = "AL2_x86_64_GPU"
+      instance_types = ["g4dn.xlarge"] # GPU instance type
 
-    min_size     = 2
-    max_size     = 5
-    desired_size = 2
+      min_size     = 2
+      max_size     = 5
+      desired_size = 2
 
-    enable_monitoring = true
-    ebs_optimized    = true
+      enable_monitoring = true
+      ebs_optimized     = true
 
-  labels = {
-    "node.kubernetes.io/instance-type" = "g4dn.xlarge"
-    "nvidia.com/gpu.present"           = "true"
-    "nvidia.com/gpu.product"           = "Tesla-T4"
-  }
+      iam_role_additional_policies = {
+        secrets_policy = aws_iam_policy.node_secrets_policy.arn
+      }
 
-  taints = {
-    dedicated = {
-      key    = "nvidia.com/gpu"
-      value  = "true"
-      effect = "NO_SCHEDULE"
-    }
-  }
+      labels = {
+        "node.kubernetes.io/instance-type" = "g4dn.xlarge"
+        "nvidia.com/gpu.present"           = "true"
+        "nvidia.com/gpu.product"           = "Tesla-T4"
+      }
 
-    block_device_mappings = {
-      xvda = {
-        device_name = "/dev/xvda"
-        ebs = {
-          volume_size           = 100
-          volume_type          = "gp3"
-          encrypted            = true
-          kms_key_id          = var.kms_key_arn
-          delete_on_termination = true
+      taints = {
+        dedicated = {
+          key    = "nvidia.com/gpu"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
+
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 100
+            volume_type           = "gp3"
+            encrypted             = true
+            kms_key_id            = var.kms_key_arn
+            delete_on_termination = true
+          }
         }
       }
     }
-  }    
   }
 
   # Enable logging
@@ -133,7 +141,7 @@ module "eks" {
 # Create CloudWatch log group for EKS logs
 resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.cluster_name}-${var.env}-cluster"
-  retention_in_days = 365  # Changed from 30 to 365
+  retention_in_days = 365 # Changed from 30 to 365
   # kms_key_id       = var.kms_key_arn
 }
 
@@ -183,4 +191,42 @@ resource "kubernetes_namespace" "gpu_resources" {
   metadata {
     name = "gpu-resources"
   }
+}
+
+resource "aws_iam_policy" "node_secrets_policy" {
+  name        = "mediaviz-dev-node-secrets-access"
+  description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecrets"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:Encrypt",
+          "kms:GenerateDataKey",
+          "kms:ReEncrypt*"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:*"  # Full SQS access
+        ]
+        Resource = ["*"]
+      }
+    ]
+  })
 }

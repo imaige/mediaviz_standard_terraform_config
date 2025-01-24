@@ -6,8 +6,8 @@ locals {
     "l-colors-model"               = "colors_model_processing"
     "l-image-comparison-model"     = "image_comparison_model_processing"
     "l-facial-recognition-model"   = "face_recognition_model_processing"
-
-    "eks-img-classification-model" = "img_classification_model_processing"
+    "eks-img-classification-model" = "image_classification_model_processing"
+    "eks-feature-extraction-model" = "feature_extraction_model_processing"
   }
 }
 
@@ -16,13 +16,14 @@ resource "aws_cloudwatch_event_rule" "image_upload" {
   name        = "${var.project_name}-${var.env}-image-upload"
   description = "Capture image upload events with photo_id and company_id"
 
-  event_pattern = jsonencode({
-    source      = ["custom.imageUpload"]
-    detail-type = ["ImageUploaded"]
-    detail = {
-      version = ["1.0"]
-    }
-  })
+event_pattern = jsonencode({
+  source = ["custom.imageUpload"]
+  detail-type = ["ImageUploaded", 
+                 "image_comparison_model_processing",
+                 "face_recognition_model_processing",
+                 "blur_model_processing",
+                 "colors_model_processing"]
+})
 
   tags = merge(var.tags, {
     Environment = var.env
@@ -34,15 +35,12 @@ resource "aws_cloudwatch_event_rule" "image_upload" {
 resource "aws_cloudwatch_event_rule" "processing_rules" {
   for_each = local.processors
 
-  name        = "${var.project_name}-${var.env}-${each.key}-processing"
+  name        = each.key
   description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
-    source      = ["custom.imageUpload"]
-    detail-type = [each.value]
-    detail = {
-      version = ["1.0"]
-    }
+    source     = ["custom.imageUpload"]
+    DetailType = [each.value]
   })
 
   tags = merge(var.tags, {
@@ -102,7 +100,6 @@ resource "aws_cloudwatch_event_target" "fanout_targets" {
   target_id = "${each.key}InitialTarget"
   arn       = var.sqs_queues[each.key]
 
-  # Transform the input to add model-specific information
   input_transformer {
     input_paths = {
       photo_id      = "$.detail.photo_id"
@@ -117,7 +114,7 @@ resource "aws_cloudwatch_event_target" "fanout_targets" {
   "bucket": "<bucket>",
   "photo_s3_link": "<photo_s3_link>",
   "model": "${each.key}",
-  "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",
+  "processor_type": "${can(regex("^l-", each.key)) ? "lambda" : "eks"}",
   "timestamp": "<timestamp>"
 }
 EOF

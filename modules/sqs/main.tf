@@ -2,7 +2,7 @@
 
 locals {
   lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model"]
-  eks_models    = ["eks-image-classification-model", "eks-facial-recognition-model"]  # Added facial recognition model
+  eks_models    = ["eks-image-classification-model", "eks-feature-extraction-model"]  # Added facial recognition model
   all_models    = concat(local.lambda_models, local.eks_models)
   
   # Normalize tags to lowercase to prevent case-sensitivity issues
@@ -166,7 +166,10 @@ resource "aws_sqs_queue_policy" "model_queues" {
         Resource = aws_sqs_queue.model_queues[each.key].arn
         Condition = {
           ArnLike = {
-            "aws:SourceArn": var.source_arns
+            "aws:SourceArn": [
+              "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.project_name}-${var.env}-image-upload",
+              "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${each.key}"
+            ]
           }
         }
       },
@@ -174,7 +177,7 @@ resource "aws_sqs_queue_policy" "model_queues" {
         Sid = "AllowProcessorAccess"
         Effect = "Allow"
         Principal = {
-          AWS = can(regex("^lambda-", each.key)) ? var.lambda_role_arns : [var.eks_role_arn]
+          AWS = can(regex("^l-", each.key)) ? var.lambda_role_arns : [var.eks_role_arn]
         }
         Action = [
           "sqs:ReceiveMessage",
@@ -183,19 +186,11 @@ resource "aws_sqs_queue_policy" "model_queues" {
           "sqs:ChangeMessageVisibility"
         ]
         Resource = aws_sqs_queue.model_queues[each.key].arn
-      },
-      {
-        Sid = "DenyNonSSLAccess"
-        Effect = "Deny"
-        Principal = "*"
-        Action = "*"
-        Resource = aws_sqs_queue.model_queues[each.key].arn
-        Condition = {
-          Bool = {
-            "aws:SecureTransport": "false"
-          }
-        }
       }
     ]
   })
 }
+
+# Add these data sources at the top of your file
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}

@@ -120,6 +120,7 @@ module "eventbridge" {
     l-image-comparison-model     = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
     l-facial-recognition-model   = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
     eks-img-classification-model = module.sqs.eks_queue_arns["eks-image-classification-model"]
+    eks-feature-extraction-model = module.sqs.eks_queue_arns["eks-feature-extraction-model"]
   }
 
   dlq_arn = module.sqs.dlq_arn
@@ -214,7 +215,8 @@ module "bastion" {
     "24.5.226.154/32",
     "73.169.81.101/32",
     "67.241.163.178/32",
-    "76.155.77.153/32"
+    "76.155.77.153/32",
+    "136.29.106.130/32"
   ]
   aurora_endpoint = module.aurora.cluster_endpoint
   tags            = var.tags
@@ -244,8 +246,8 @@ module "eks_processors" {
   replicas      = 1
 
   sqs_queues = {
-    "facial-recognition-model"   = module.sqs.eks_queue_arns["eks-facial-recognition-model"]
-    "image-classification-model" = module.sqs.eks_queue_arns["eks-image-classification-model"]
+    "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
+    "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
   }
 
   kms_key_arn       = module.security.kms_key_arn

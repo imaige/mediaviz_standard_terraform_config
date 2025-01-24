@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: ${image_repository}
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   tag: ${image_tag}
 
 serviceAccount:
