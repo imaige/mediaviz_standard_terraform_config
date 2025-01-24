@@ -16,10 +16,11 @@ logger.setLevel(logging.INFO)
 
 # Configure AWS RDS Data client
 config = Config(
-    retries = dict(
-        max_attempts = 3
+    retries=dict(
+        max_attempts=3
     )
 )
+
 
 class ImageUploadHandler:
     def __init__(self):
@@ -73,7 +74,7 @@ class ImageUploadHandler:
             },
             'body': json.dumps(body)
         }
-        
+
     def upload_to_s3(self, file_content: bytes, file_path: str, bucket_name: str, content_type: str) -> bool:
         """Upload file to S3 with metadata."""
         try:
@@ -94,7 +95,7 @@ class ImageUploadHandler:
         except ClientError as e:
             logger.error(f"Error uploading to S3: {str(e)}")
             return False
-            
+
     def insert_photo_to_database(
             self,
             request_id: uuid,
@@ -165,30 +166,33 @@ class ImageUploadHandler:
                 {'name': 'company_id', 'value': {'longValue': company_id}},
                 {'name': 'photo_s3_link', 'value': {'stringValue': photo_s3_link}},
                 {'name': 'project_table_name', 'value': {'stringValue': project_table_name}},
-                {'name': 'client_side_id', 'value': {'stringValue': client_side_id} if client_side_id else {'isNull': True}},
+                {'name': 'client_side_id',
+                 'value': {'stringValue': client_side_id} if client_side_id else {'isNull': True}},
                 {'name': 'file_path', 'value': {'stringValue': file_path} if file_path else {'isNull': True}},
                 {'name': 'title', 'value': {'stringValue': title} if title else {'isNull': True}},
                 {'name': 'description', 'value': {'stringValue': description} if description else {'isNull': True}},
                 {'name': 'format', 'value': {'stringValue': format} if format else {'isNull': True}},
                 {'name': 'size', 'value': {'longValue': size} if size else {'isNull': True}},
-                {'name': 'source_resolution_x', 'value': {'longValue': source_resolution_x} if source_resolution_x else {'isNull': True}},
-                {'name': 'source_resolution_y', 'value': {'longValue': source_resolution_y} if source_resolution_y else {'isNull': True}},
-                {'name': 'date_taken', 'value': {'stringValue': date_taken} if date_taken else {'isNull': True}},  # handling of None done above
+                {'name': 'source_resolution_x',
+                 'value': {'longValue': source_resolution_x} if source_resolution_x else {'isNull': True}},
+                {'name': 'source_resolution_y',
+                 'value': {'longValue': source_resolution_y} if source_resolution_y else {'isNull': True}},
+                {'name': 'date_taken', 'value': {'stringValue': date_taken} if date_taken else {'isNull': True}},
+                # handling of None done above
                 {'name': 'date_uploaded', 'value': {'stringValue': datetime.now().isoformat()}},
                 {'name': 'latitude', 'value': {'doubleValue': latitude} if latitude else {'isNull': True}},
                 {'name': 'longitude', 'value': {'doubleValue': longitude} if longitude else {'isNull': True}},
             ]
         )
         if response['records']:
-            # Add your processing logic here
-            generated_photo_id = response['records'][0][0]['longValue']  # Assuming photo_id is an integer
-            logger.info(f"Successfully processed photo {generated_photo_id} for client {company_id}")
+            generated_photo_id = response['records'][0][0]['longValue']
+            logger.info(f"DB insert Successful for photo {generated_photo_id} for client {company_id}")
             return generated_photo_id
         else:
             logger.error(f"Error generating record for photo from request {request_id} for client {company_id}")
 
-
-    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, photo_id: int, photo_s3_url: str, models: str, timestamp) -> bool:
+    def send_events_to_eventbridge(self, request_id: uuid, bucket: str, photo_id: int, photo_s3_url: str, models: str,
+                                   timestamp) -> bool:
         """Send processing events to EventBridge."""
         try:
             # Prepare common event details
@@ -216,25 +220,25 @@ class ImageUploadHandler:
 
             models_parsed = models.split(",")
 
-            # Send events for each processing model
+            # Create events for each processing model
             for model_name in models_parsed:
-                logger.info(f"creating event for model {model_name} for photo {photo_id}")
                 event = {
                     'Source': 'custom.imageUpload',
-                    'DetailType': f"{model_name}_processing",
+                    'DetailType': f"{model_name.strip()}_processing",
                     'Detail': json.dumps({
                         **common_detail,
-                        'processingType': model_name
+                        'processingType': model_name.strip()
                     }),
                     'EventBusName': 'default'
                 }
+
                 events.append(event)
 
             # Send all events in a single batch
-            logger.info(f"publishing events for photo {photo_id}")
             self.eventbridge_client.put_events(Entries=events)
+            logger.info(f"Upload & event creation complete for photo {photo_id} for client {company_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error sending events to EventBridge: {str(e)}")
             return False
@@ -332,7 +336,7 @@ class ImageUploadHandler:
 
             # Send events to EventBridge - retry handled by DLQ
             if not self.send_events_to_eventbridge(
-                request_id, bucket_name, photo_id, s3_url, models, timestamp
+                    request_id, bucket_name, photo_id, s3_url, models, timestamp
             ):
                 logger.error(f"Warning: EventBridge event sending failed for photo {photo_id}")
 
@@ -348,8 +352,10 @@ class ImageUploadHandler:
             logger.error(f"Unexpected error: {str(e)}")
             return self.create_response(500, {'error': 'Internal server error'})
 
+
 # Initialize handler
 handler = ImageUploadHandler()
+
 
 # Lambda entry point
 def handle_upload(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
