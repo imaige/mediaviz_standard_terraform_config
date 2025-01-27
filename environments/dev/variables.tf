@@ -104,7 +104,7 @@ variable "retention_days" {
 variable "lambda_memory_size" {
   description = "Memory size for Lambda function"
   type        = number
-  default     = 128
+  default     = 1024
 }
 
 variable "lambda_timeout" {

@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: ${image_repository}
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   tag: ${image_tag}
 
 serviceAccount:
@@ -35,3 +35,9 @@ env:
     value: ${environment}
   - name: MODEL_NAME
     value: ${model_name}
+  - name: DB_CLUSTER_ARN
+    value: ${db_cluster_arn}
+  - name: DB_SECRET_ARN
+    value: ${db_secret_arn}
+  - name: DB_NAME
+    value: ${db_name}

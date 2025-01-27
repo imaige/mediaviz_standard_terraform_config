@@ -42,20 +42,38 @@ output "lambda_queue_urls" {
 }
 
 # EKS-specific queue outputs
+# In sqs/outputs.tf
+
 output "eks_queue_arns" {
-  description = "Map of EKS model names to their queue ARNs"
+  description = "Map of EKS model queue ARNs"
   value = {
-    for k, v in aws_sqs_queue.model_queues : k => v.arn
-    if can(regex("^eks-", k))
+    for model in local.eks_models :
+    model => aws_sqs_queue.model_queues[model].arn
   }
 }
 
 output "eks_queue_urls" {
-  description = "Map of EKS model names to their queue URLs"
+  description = "Map of EKS model queue URLs"
   value = {
-    for k, v in aws_sqs_queue.model_queues : k => v.url
-    if can(regex("^eks-", k))
+    for model in local.eks_models :
+    model => aws_sqs_queue.model_queues[model].url
   }
+}
+
+output "eks_dlq_arns" {
+  description = "Map of EKS model dead-letter queue ARNs"
+  value = var.enable_dlq ? {
+    for model in local.eks_models :
+    model => aws_sqs_queue.model_dlqs[model].arn
+  } : {}
+}
+
+output "eks_dlq_urls" {
+  description = "Map of EKS model dead-letter queue URLs"
+  value = var.enable_dlq ? {
+    for model in local.eks_models :
+    model => aws_sqs_queue.model_dlqs[model].url
+  } : {}
 }
 
 # DLQ outputs
