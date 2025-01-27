@@ -1,64 +1,24 @@
 # eventbridge/outputs.tf
 
-output "image_upload_rule_arn" {
-  description = "ARN of the image upload EventBridge rule"
-  value       = aws_cloudwatch_event_rule.image_upload.arn
+# Temporarily commented out while rules are removed
+output "processing_rule_arns" {
+  description = "ARNs of the EventBridge processing rules"
+  value       = { for k, v in aws_cloudwatch_event_rule.processing_rules : k => v.arn }
 }
 
-output "image_upload_rule_name" {
-  description = "Name of the image upload EventBridge rule"
-  value       = aws_cloudwatch_event_rule.image_upload.name
+output "processing_rule_names" {
+  description = "Names of the EventBridge processing rules"
+  value       = { for k, v in aws_cloudwatch_event_rule.processing_rules : k => v.name }
 }
 
-output "processing_rules" {
-  description = "Map of processing rule details by model"
-  value = {
-    for k, v in aws_cloudwatch_event_rule.processing_rules : k => {
-      arn  = v.arn
-      name = v.name
-      id   = v.id
-    }
-  }
-}
-
-output "lambda_processing_rules" {
-  description = "Map of Lambda processing rule ARNs"
-  value = {
-    for k, v in aws_cloudwatch_event_rule.processing_rules : k => v.arn
-    if can(regex("^lambda-", k))
-  }
-}
-
-output "eks_processing_rules" {
-  description = "Map of EKS processing rule ARNs"
-  value = {
-    for k, v in aws_cloudwatch_event_rule.processing_rules : k => v.arn
-    if can(regex("^eks-", k))
-  }
-}
-
-output "log_group_name" {
-  description = "Name of the CloudWatch Log Group for EventBridge"
+# Keeping this output since the log group is still active
+output "event_bus_log_group" {
+  description = "Name of the CloudWatch Log Group for EventBridge events"
   value       = aws_cloudwatch_log_group.eventbridge_logs.name
 }
 
-output "log_group_arn" {
-  description = "ARN of the CloudWatch Log Group for EventBridge"
-  value       = aws_cloudwatch_log_group.eventbridge_logs.arn
-}
-
+# Temporary empty list output to satisfy any dependencies
 output "event_bus_rule_arns" {
-  description = "List of all EventBridge rule ARNs"
-  value = concat(
-    [aws_cloudwatch_event_rule.image_upload.arn],
-    [for rule in aws_cloudwatch_event_rule.processing_rules : rule.arn]
-  )
-}
-
-# Optional: Add target details if needed
-output "target_ids" {
-  description = "Map of target IDs by model"
-  value = {
-    for k, v in aws_cloudwatch_event_target.processor_targets : k => v.target_id
-  }
+  description = "Temporary empty list while rules are being recreated"
+  value       = []
 }

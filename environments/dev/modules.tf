@@ -241,6 +241,10 @@ module "eks_processors" {
   env          = var.env
   aws_region   = var.aws_region
 
+  aurora_cluster_arn   = module.aurora.cluster_arn
+  aurora_secret_arn    = module.aurora.secret_arn
+  aurora_database_name = module.aurora.database_name
+
   namespace     = "default"
   chart_version = "0.1.0"
   replicas      = 1

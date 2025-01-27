@@ -1,11 +1,11 @@
 locals {
   models = {
     "feature-extraction-model" = {
-      short_name = "feature-extraction"
+      short_name      = "feature-extraction"
       service_account = "eks-processor-feature-extraction-model"
     }
     "image-classification-model" = {
-      short_name = "image-classification"
+      short_name      = "image-classification"
       service_account = "eks-processor-image-classification-model"
     }
   }
@@ -17,7 +17,7 @@ resource "aws_ecr_repository" "model_repos" {
 
   name                 = "${var.project_name}-${var.env}-eks-${each.key}"
   image_tag_mutability = "MUTABLE"
-  
+
   image_scanning_configuration {
     scan_on_push = true
   }
@@ -38,9 +38,9 @@ resource "aws_ecr_repository" "model_repos" {
 resource "helm_release" "model_deployments" {
   for_each = local.models
 
-  name       = "eks-${each.value.short_name}"
-  namespace  = var.namespace
-  chart      = "${path.module}/chart"
+  name      = "eks-${each.value.short_name}"
+  namespace = var.namespace
+  chart     = "${path.module}/chart"
 
   create_namespace = true
   wait             = true
@@ -55,6 +55,10 @@ resource "helm_release" "model_deployments" {
       aws_region       = var.aws_region
       environment      = var.env
       model_name       = each.key
+      short_name       = each.value.short_name
+      db_cluster_arn   = var.aurora_cluster_arn
+      db_secret_arn    = var.aurora_secret_arn
+      db_name          = var.aurora_database_name
     })
   ]
 
@@ -80,7 +84,7 @@ resource "aws_iam_role" "model_role" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(var.oidc_provider, "https://", "")}:sub": "system:serviceaccount:${var.namespace}:eks-processor-${each.value.short_name}-model"
+            "${replace(var.oidc_provider, "https://", "")}:sub" : "system:serviceaccount:${var.namespace}:eks-processor-${each.value.short_name}-model"
           }
         }
       }

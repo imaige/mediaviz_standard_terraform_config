@@ -58,3 +58,17 @@ variable "tags" {
  type        = map(string)
  default     = {}
 }
+variable "aurora_cluster_arn" {
+  description = "ARN of the Aurora cluster"
+  type        = string
+}
+
+variable "aurora_secret_arn" {
+  description = "ARN of the Aurora secret"
+  type        = string
+}
+
+variable "aurora_database_name" {
+  description = "Name of the Aurora database"
+  type        = string
+}

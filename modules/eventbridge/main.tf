@@ -11,42 +11,22 @@ locals {
   }
 }
 
-# Image Upload Rule
-resource "aws_cloudwatch_event_rule" "image_upload" {
-  name        = "${var.project_name}-${var.env}-image-upload"
-  description = "Capture image upload events with photo_id and company_id"
-
-event_pattern = jsonencode({
-  source = ["custom.imageUpload"]
-  detail-type = ["ImageUploaded", 
-                 "image_comparison_model_processing",
-                 "face_recognition_model_processing",
-                 "blur_model_processing",
-                 "colors_model_processing"]
-})
-
-  tags = merge(var.tags, {
-    Environment = var.env
-    Terraform   = "true"
-  })
-}
-
 # Processing Rules for all models
 resource "aws_cloudwatch_event_rule" "processing_rules" {
   for_each = local.processors
 
-  name        = each.key
+  name        = each.key  # Using just the model name as the rule name
   description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
-    source     = ["custom.imageUpload"]
-    DetailType = [each.value]
+    source       = ["custom.imageUpload"]
+    "detail-type" = [each.value]
   })
 
   tags = merge(var.tags, {
     Environment = var.env
     Model       = each.key
-    Type        = can(regex("^lambda-", each.key)) ? "lambda" : "eks"
+    Type        = can(regex("^l-", each.key)) ? "lambda" : "eks"
     Terraform   = "true"
   })
 }
@@ -55,7 +35,7 @@ resource "aws_cloudwatch_event_rule" "processing_rules" {
 resource "aws_cloudwatch_event_target" "processor_targets" {
   for_each = local.processors
 
-  rule      = aws_cloudwatch_event_rule.processing_rules[each.key].name
+  rule      = aws_cloudwatch_event_rule.processing_rules[each.key].name  # Reference the rule by its resource name
   target_id = "${each.key}ProcessingQueue"
   arn       = var.sqs_queues[each.key]
 
@@ -66,46 +46,7 @@ resource "aws_cloudwatch_event_target" "processor_targets" {
       timestamp     = "$.time"
       bucket        = "$.detail.bucket"
       photo_s3_link = "$.detail.photo_s3_link"
-    }
-
-    input_template = <<EOF
-{
-  "photo_id": "<photo_id>",
-  "bucket": "<bucket>",
-  "photo_s3_link": "<photo_s3_link>",
-  "model": "${each.key}",
-  "processor_type": "${can(regex("^lambda-", each.key)) ? "lambda" : "eks"}",
-  "timestamp": "<timestamp>"
-}
-EOF
-  }
-
-  # Add retry policy
-  retry_policy {
-    maximum_event_age_in_seconds = 86400 # 24 hours
-    maximum_retry_attempts       = 3
-  }
-
-  # Add dead-letter config
-  dead_letter_config {
-    arn = var.dlq_arn
-  }
-}
-
-# Fan-out target from main upload event
-resource "aws_cloudwatch_event_target" "fanout_targets" {
-  for_each = local.processors
-
-  rule      = aws_cloudwatch_event_rule.image_upload.name
-  target_id = "${each.key}InitialTarget"
-  arn       = var.sqs_queues[each.key]
-
-  input_transformer {
-    input_paths = {
-      photo_id      = "$.detail.photo_id"
-      timestamp     = "$.time"
-      bucket        = "$.detail.bucket"
-      photo_s3_link = "$.detail.photo_s3_link"
+      models        = "$.detail.models"
     }
 
     input_template = <<EOF
@@ -115,7 +56,8 @@ resource "aws_cloudwatch_event_target" "fanout_targets" {
   "photo_s3_link": "<photo_s3_link>",
   "model": "${each.key}",
   "processor_type": "${can(regex("^l-", each.key)) ? "lambda" : "eks"}",
-  "timestamp": "<timestamp>"
+  "timestamp": "<timestamp>",
+  "models": <models>
 }
 EOF
   }
