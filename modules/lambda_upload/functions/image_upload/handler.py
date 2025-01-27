@@ -236,7 +236,7 @@ class ImageUploadHandler:
 
             # Send all events in a single batch
             self.eventbridge_client.put_events(Entries=events)
-            logger.info(f"Upload & event creation complete for photo {photo_id} for client {company_id}")
+            logger.info(f"Upload & event creation complete for photo {photo_id}")
             return True
 
         except Exception as e:
