@@ -6,28 +6,38 @@ locals {
     "l-colors-model"               = "colors_model_processing"
     "l-image-comparison-model"     = "image_comparison_model_processing"
     "l-facial-recognition-model"   = "face_recognition_model_processing"
-    "eks-img-classification-model" = "image_classification_model_processing"
+    "eks-image-classification-model" = "image_classification_model_processing"
     "eks-feature-extraction-model" = "feature_extraction_model_processing"
   }
+}
+
+# Image Upload Rule
+resource "aws_cloudwatch_event_rule" "image_upload" {
+  name        = "${var.project_name}-${var.env}-image-upload"
+  description = "Capture image upload events"
+
+  event_pattern = jsonencode({
+    source      = ["custom.imageUpload"]
+    detail-type = ["ImageUploaded"]
+  })
 }
 
 # Processing Rules for all models
 resource "aws_cloudwatch_event_rule" "processing_rules" {
   for_each = local.processors
 
-  name        = each.key  # Using just the model name as the rule name
+  name        = each.key
   description = "Trigger ${each.key} processing via SQS"
 
   event_pattern = jsonencode({
-    source       = ["custom.imageUpload"]
-    "detail-type" = [each.value]
+    source      = ["custom.imageUpload"]
+    detail-type = [each.value]
   })
 
   tags = merge(var.tags, {
     Environment = var.env
     Model       = each.key
     Type        = can(regex("^l-", each.key)) ? "lambda" : "eks"
-    Terraform   = "true"
   })
 }
 
@@ -35,29 +45,22 @@ resource "aws_cloudwatch_event_rule" "processing_rules" {
 resource "aws_cloudwatch_event_target" "processor_targets" {
   for_each = local.processors
 
-  rule      = aws_cloudwatch_event_rule.processing_rules[each.key].name  # Reference the rule by its resource name
+  rule      = aws_cloudwatch_event_rule.processing_rules[each.key].name
   target_id = "${each.key}ProcessingQueue"
   arn       = var.sqs_queues[each.key]
 
-  # Transform the input to add model-specific information
+  # Transform the input to ensure proper formatting
   input_transformer {
     input_paths = {
-      photo_id      = "$.detail.photo_id"
-      timestamp     = "$.time"
-      bucket        = "$.detail.bucket"
-      photo_s3_link = "$.detail.photo_s3_link"
-      models        = "$.detail.models"
+      "source"      = "$.source"
+      "detail-type" = "$.detail-type"
+      "detail"      = "$.detail"
     }
-
     input_template = <<EOF
 {
-  "photo_id": "<photo_id>",
-  "bucket": "<bucket>",
-  "photo_s3_link": "<photo_s3_link>",
-  "model": "${each.key}",
-  "processor_type": "${can(regex("^l-", each.key)) ? "lambda" : "eks"}",
-  "timestamp": "<timestamp>",
-  "models": <models>
+  "source": <source>,
+  "detail-type": <detail-type>,
+  "detail": <detail>
 }
 EOF
   }
@@ -81,6 +84,28 @@ resource "aws_cloudwatch_log_group" "eventbridge_logs" {
 
   tags = merge(var.tags, {
     Environment = var.env
-    Terraform   = "true"
   })
+}
+
+# Debug target (optional - remove if not needed)
+resource "aws_cloudwatch_event_target" "debug_target" {
+  rule      = "l-image-comparison-model"
+  target_id = "DebugTarget"
+  arn       = aws_cloudwatch_log_group.eventbridge_logs.arn
+
+  input_transformer {
+    input_paths = {
+      source      = "$.source"
+      detailtype  = "$.detail-type"
+      detail      = "$.detail"
+    }
+    input_template = <<EOF
+{
+  "source": <source>,
+  "detail-type": <detailtype>,
+  "detail": <detail>,
+  "debug": "Matching event received"
+}
+EOF
+  }
 }

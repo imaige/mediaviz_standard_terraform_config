@@ -133,6 +133,23 @@ resource "aws_iam_role_policy" "model_policies" {
           "arn:aws:s3:::*",
           "arn:aws:s3:::*/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-data:*"
+        ]
+        Resource = var.aurora_cluster_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:*",
+          "kms:*"
+        ]
+        Resource = [
+        "*"
+        ]
       }
     ]
   })

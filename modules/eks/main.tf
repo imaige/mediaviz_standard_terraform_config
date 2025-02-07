@@ -212,6 +212,17 @@ resource "aws_iam_policy" "node_secrets_policy" {
       {
         Effect = "Allow"
         Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:CommitTransaction",
+          "rds-data:RollbackTransaction"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "kms:Decrypt",
           "kms:DescribeKey",
           "kms:Encrypt",
@@ -224,6 +235,13 @@ resource "aws_iam_policy" "node_secrets_policy" {
         Effect = "Allow"
         Action = [
           "sqs:*"  # Full SQS access
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutBucketPublicAccessBlock"
         ]
         Resource = ["*"]
       }
