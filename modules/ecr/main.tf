@@ -6,7 +6,13 @@ locals {
     "l-colors-model",
     "l-image-comparison-model", 
     "l-facial-recognition-model",
-
+    "eks-feature-extraction-model",
+    "eks-image-comparison-model",
+    "eks-mediaviz-external-api",
+    "eks-evidence-model",
+    "eks-similarity-model",
+    "eks-image-classification-model",
+    "eks-external-api"
   ]
 }
 
@@ -29,6 +35,7 @@ resource "aws_ecr_repository" "lambda_repos" {
   tags = merge(var.tags, {
     Environment = var.env
     Name        = each.value
+    Type        = can(regex("^l-", each.value)) ? "lambda" : "eks"  # Added type tag
     Terraform   = "true"
   })
 }
@@ -64,12 +71,16 @@ data "aws_iam_policy_document" "lambda_repos" {
   version = "2012-10-17"
 
   statement {
-    sid    = "AllowLambdaAccess"
+    sid    = "AllowServiceAccess"
     effect = "Allow"
 
     principals {
       type = "Service"
-      identifiers = ["lambda.amazonaws.com"]
+      identifiers = each.value != null ? (
+        startswith(each.value, "l-") ? 
+        ["lambda.amazonaws.com"] : 
+        ["eks.amazonaws.com"]
+      ) : []
     }
 
     principals {
@@ -102,19 +113,19 @@ resource "aws_ecr_repository_policy" "lambda_repos" {
   policy     = data.aws_iam_policy_document.lambda_repos[each.value].json
 }
 
-# Outputs
+# Outputs# Outputs
 output "repository_urls" {
   description = "URLs of the created ECR repositories"
   value = {
-    for repo in local.repositories :
-    repo => aws_ecr_repository.lambda_repos[repo].repository_url
+    for k, v in aws_ecr_repository.lambda_repos :
+    k => v.repository_url
   }
 }
 
 output "repository_arns" {
   description = "ARNs of the created ECR repositories"
   value = {
-    for repo in local.repositories :
-    repo => aws_ecr_repository.lambda_repos[repo].arn
+    for k, v in aws_ecr_repository.lambda_repos :
+    k => v.arn
   }
 }

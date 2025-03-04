@@ -89,9 +89,9 @@ module "eks" {
       ami_type       = "AL2_x86_64_GPU"
       instance_types = ["g4dn.xlarge"] # GPU instance type
 
-      min_size     = 2
-      max_size     = 5
-      desired_size = 2
+      min_size     = 6
+      max_size     = 12
+      desired_size = 8
 
       enable_monitoring = true
       ebs_optimized     = true

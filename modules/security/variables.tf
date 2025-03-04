@@ -16,3 +16,7 @@ variable "eks_node_role_arn" {
 variable "tags" {
   default = {}
 }
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+}

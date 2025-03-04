@@ -315,3 +315,77 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed" {
     }
   }
 }
+
+# Helm charts bucket
+resource "aws_s3_bucket" "helm_charts" {
+  bucket = "${var.project_name}-${var.env}-helm-charts"
+  
+  tags = {
+    Environment = var.env
+    Terraform   = "true"
+  }
+}
+
+# Enable versioning for helm charts bucket
+resource "aws_s3_bucket_versioning" "helm_charts" {
+  bucket = aws_s3_bucket.helm_charts.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Block public access
+resource "aws_s3_bucket_public_access_block" "helm_charts" {
+  bucket = aws_s3_bucket.helm_charts.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Enable server-side encryption
+resource "aws_s3_bucket_server_side_encryption_configuration" "helm_charts" {
+  bucket = aws_s3_bucket.helm_charts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = var.kms_key_arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Add lifecycle configuration
+resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
+  bucket = aws_s3_bucket.helm_charts.id
+
+  rule {
+    id     = "cleanup"
+    status = "Enabled"
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+
+    # Optional: Add expiration if you want to clean up old chart versions
+    expiration {
+      days = 365  # Adjust retention period as needed
+    }
+  }
+}
+
+# Enable logging for helm charts bucket
+resource "aws_s3_bucket_logging" "helm_charts" {
+  bucket = aws_s3_bucket.helm_charts.id
+
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "helm-charts-log/"
+}
+
+# Enable EventBridge notifications
+resource "aws_s3_bucket_notification" "helm_charts_notification" {
+  bucket = aws_s3_bucket.helm_charts.id
+  eventbridge = true
+}

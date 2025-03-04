@@ -3,15 +3,42 @@ locals {
     "feature-extraction-model" = {
       short_name      = "feature-extraction"
       service_account = "eks-processor-feature-extraction-model"
+      needs_sqs       = true
+      needs_helm      = true
     }
     "image-classification-model" = {
       short_name      = "image-classification"
       service_account = "eks-processor-image-classification-model"
+      needs_sqs       = true
+      needs_helm      = true
     }
+    "external-api" = {
+      short_name      = "external-api"
+      service_account = "eks-processor-external-api"
+      needs_sqs       = false
+      needs_helm      = false
+    }
+        # Add the new evidence model here
+    "evidence-model" = {
+      short_name      = "evidence"
+      service_account = "eks-processor-evidence-model"
+      needs_sqs       = false  # Set to true if it needs SQS, otherwise false
+      needs_helm      = false  # Set to true if it needs Helm deployment
+    }
+  }
+  
+  # Filtered map for models that need Helm deployments
+  helm_models = {
+    for k, v in local.models : k => v if v.needs_helm
+  }
+  
+  # Filtered map for models that need SQS
+  sqs_models = {
+    for k, v in local.models : k => v if v.needs_sqs
   }
 }
 
-# ECR repositories
+# ECR repositories for all models
 resource "aws_ecr_repository" "model_repos" {
   for_each = local.models
 
@@ -34,9 +61,9 @@ resource "aws_ecr_repository" "model_repos" {
   }
 }
 
-# Helm releases
+# Helm releases only for models that need it
 resource "helm_release" "model_deployments" {
-  for_each = local.models
+  for_each = local.helm_models
 
   name      = "eks-${each.value.short_name}"
   namespace = var.namespace
@@ -67,7 +94,8 @@ resource "helm_release" "model_deployments" {
     aws_iam_role.model_role
   ]
 }
-# IAM roles
+
+# IAM roles for all models
 resource "aws_iam_role" "model_role" {
   for_each = local.models
 
@@ -98,9 +126,7 @@ resource "aws_iam_role" "model_role" {
   }
 }
 
-# IAM policies
-
-# IAM Role Policy
+# IAM policies for all models, with conditional SQS permissions
 resource "aws_iam_role_policy" "model_policies" {
   for_each = local.models
 
@@ -109,49 +135,53 @@ resource "aws_iam_role_policy" "model_policies" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "sqs:SendMessage",
-          "sqs:ChangeMessageVisibility"
-        ]
-        Resource = [
-          "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${split("/", var.sqs_queues[each.key])[4]}"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          "arn:aws:s3:::*",
-          "arn:aws:s3:::*/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "rds-data:*"
-        ]
-        Resource = var.aurora_cluster_arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:*",
-          "kms:*"
-        ]
-        Resource = [
-        "*"
-        ]
-      }
-    ]
+    Statement = concat(
+      # SQS permissions - only for models that need it
+      each.value.needs_sqs ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:SendMessage",
+            "sqs:ChangeMessageVisibility"
+          ]
+          Resource = [
+            "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${split("/", var.sqs_queues[each.key])[4]}"
+          ]
+        }
+      ] : [],
+      # Common permissions for all models
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ]
+          Resource = [
+            "arn:aws:s3:::*",
+            "arn:aws:s3:::*/*"
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "rds-data:*"
+          ]
+          Resource = var.aurora_cluster_arn
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "secretsmanager:*",
+            "kms:*"
+          ]
+          Resource = ["*"]
+        }
+      ]
+    )
   })
 }
 

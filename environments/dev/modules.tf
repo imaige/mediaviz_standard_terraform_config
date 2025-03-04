@@ -176,6 +176,7 @@ module "security" {
   kms_key_id   = module.security.kms_key_id
   # eks_node_role_arn = module.eks.eks_managed_node_role_arn
   tags = var.tags
+  cluster_name = module.eks.cluster_name
 
 }
 
@@ -218,7 +219,8 @@ module "bastion" {
     "76.155.77.153/32",
     "136.29.106.130/32",
     "67.162.158.188/32",
-    "136.36.145.192/32"
+    "136.36.145.192/32",
+    "135.129.132.20/32"
   ]
   aurora_endpoint = module.aurora.cluster_endpoint
   tags            = var.tags
