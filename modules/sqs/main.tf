@@ -2,7 +2,7 @@
 
 locals {
   lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model"]
-  eks_models    = ["eks-image-classification-model", "eks-feature-extraction-model"]  # Added facial recognition model
+  eks_models    = ["eks-image-classification-model", "eks-feature-extraction-model"]
   all_models    = concat(local.lambda_models, local.eks_models)
   
   # Normalize tags to lowercase to prevent case-sensitivity issues
@@ -168,7 +168,7 @@ resource "aws_sqs_queue_policy" "model_queues" {
           ArnLike = {
             "aws:SourceArn": [
               "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.project_name}-${var.env}-image-upload",
-              "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${each.key}"
+              "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${replace(each.key, "lambda-", "l-")}" 
             ]
           }
         }

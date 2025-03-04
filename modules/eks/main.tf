@@ -89,9 +89,9 @@ module "eks" {
       ami_type       = "AL2_x86_64_GPU"
       instance_types = ["g4dn.xlarge"] # GPU instance type
 
-      min_size     = 2
-      max_size     = 5
-      desired_size = 2
+      min_size     = 6
+      max_size     = 12
+      desired_size = 8
 
       enable_monitoring = true
       ebs_optimized     = true
@@ -212,6 +212,17 @@ resource "aws_iam_policy" "node_secrets_policy" {
       {
         Effect = "Allow"
         Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:CommitTransaction",
+          "rds-data:RollbackTransaction"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "kms:Decrypt",
           "kms:DescribeKey",
           "kms:Encrypt",
@@ -224,6 +235,13 @@ resource "aws_iam_policy" "node_secrets_policy" {
         Effect = "Allow"
         Action = [
           "sqs:*"  # Full SQS access
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutBucketPublicAccessBlock"
         ]
         Resource = ["*"]
       }

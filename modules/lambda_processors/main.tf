@@ -1,12 +1,12 @@
 # lambda_processors/main.tf
 
 locals {
+  # Update mapping to match what Lambda sends
   lambda_functions = {
-    "l-blur-model"               = "blur_model_processing"
-    "l-colors-model"             = "colors_model_processing"
-    "l-image-comparison-model"   = "image_comparison_model_processing"
-    "l-facial-recognition-model" = "face_recognition_model_processing"
-
+    "l-blur-model"               = "blur_model"               # Base model name without _processing
+    "l-colors-model"             = "colors_model"
+    "l-image-comparison-model"   = "image_comparison_model"
+    "l-facial-recognition-model" = "face_recognition_model"
   }
 }
 
@@ -251,13 +251,24 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn = var.sqs_queues[each.key]
   function_name    = aws_lambda_function.processor[each.key].arn
   batch_size       = 1
-  maximum_batching_window_in_seconds = 0
+  maximum_batching_window_in_seconds = 0  # Set to 0 to process immediately
+  enabled          = true               # Explicitly enable the mapping
   
   scaling_config {
-    maximum_concurrency = 2
+    maximum_concurrency = 1000             # Start with lower concurrency
   }
 
   function_response_types = ["ReportBatchItemFailures"]
+
+  # Add filter criteria to match EventBridge events
+  # filter_criteria {
+  #   filter {
+  #     pattern = jsonencode({
+  #       detail-type = ["${each.value}_processing"]  # Match the processing suffix
+  #       source     = ["custom.imageUpload"]
+  #     })
+  #   }
+  # }
 }
 
 resource "aws_iam_role_policy" "rekognition_policy" {
