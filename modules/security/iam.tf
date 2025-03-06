@@ -13,7 +13,7 @@ resource "aws_identitystore_group" "eks_admins" {
 # Get existing user from Identity Store
 data "aws_identitystore_user" "dmitrii" {
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
-  
+
   alternate_identifier {
     unique_attribute {
       attribute_path  = "UserName"
