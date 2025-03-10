@@ -1,28 +1,33 @@
-# modules/ecr/variables.tf
-
 variable "project_name" {
-  type        = string
   description = "Name of the project"
+  type        = string
 }
 
 variable "env" {
+  description = "Environment (dev, qa, prod, shared)"
   type        = string
-  description = "Environment (dev, staging, prod)"
-}
-
-variable "tags" {
-  type        = map(string)
-  description = "Tags to apply to resources"
-  default     = {}
 }
 
 variable "kms_key_arn" {
-  type        = string
   description = "ARN of KMS key for ECR encryption"
+  type        = string
 }
 
 variable "cross_account_arns" {
+  description = "List of cross-account ARNs that can access these repositories"
   type        = list(string)
-  description = "List of ARNs that should have pull access to the repositories"
   default     = []
+}
+
+# Add this variable to override the local repositories list in main.tf
+variable "ecr_repositories" {
+  description = "List of ECR repositories to create"
+  type        = list(string)
+  default     = []  # Empty default allows the module to use its internal local.repositories if not specified
+}
+
+variable "tags" {
+  description = "A map of tags to add to all resources"
+  type        = map(string)
+  default     = {}
 }

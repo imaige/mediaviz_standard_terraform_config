@@ -1,7 +1,8 @@
 # modules/ecr/main.tf
 
 locals {
-  repositories = [
+  # Default repositories if none are specified via variable
+  default_repositories = [
     "l-blur-model",
     "l-colors-model",
     "l-image-comparison-model", 
@@ -14,6 +15,9 @@ locals {
     "eks-image-classification-model",
     "eks-external-api"
   ]
+  
+  # Use provided repositories if specified, otherwise use defaults
+  repositories = length(var.ecr_repositories) > 0 ? var.ecr_repositories : local.default_repositories
 }
 
 resource "aws_ecr_repository" "lambda_repos" {
@@ -113,7 +117,7 @@ resource "aws_ecr_repository_policy" "lambda_repos" {
   policy     = data.aws_iam_policy_document.lambda_repos[each.value].json
 }
 
-# Outputs# Outputs
+# Outputs
 output "repository_urls" {
   description = "URLs of the created ECR repositories"
   value = {
