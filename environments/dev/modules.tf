@@ -73,9 +73,10 @@ module "lambda_processors" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
 
-  # ECR configurations 
-  ecr_repository_url  = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.env}"
-  ecr_repository_arns = values(module.ecr.repository_arns)
+  # ECR configurations - Updated to use shared account ECR repositories
+  ecr_repository_url  = "${var.shared_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-shared"
+  # We're not using local ECR repositories anymore, so we use an empty list or shared repositories ARNs
+  ecr_repository_arns = local.shared_ecr_repository_arns
 
   # SQS configurations - use the map of queue ARNs
   sqs_queues = {
@@ -226,17 +227,18 @@ module "bastion" {
   tags            = var.tags
 }
 
-module "ecr" {
-  source = "./../../modules/ecr"
-
-  project_name = var.project_name
-  env          = var.env
-  kms_key_arn  = module.security.kms_key_arn
-
-  cross_account_arns = [] # Add any cross-account ARNs if needed
-
-  tags = var.tags
-}
+# Remove the ECR module since we're using the shared account repositories
+# module "ecr" {
+#   source = "./../../modules/ecr"
+#
+#   project_name = var.project_name
+#   env          = var.env
+#   kms_key_arn  = module.security.kms_key_arn
+#
+#   cross_account_arns = [] # Add any cross-account ARNs if needed
+#
+#   tags = var.tags
+# }
 
 module "eks_processors" {
   source = "./../../modules/eks_processors"
@@ -262,5 +264,36 @@ module "eks_processors" {
   oidc_provider     = module.eks.oidc_provider
   oidc_provider_arn = module.eks.oidc_provider_arn
 
+  tags = var.tags
+}
+
+# Add cross-account role module
+module "cross_account_roles" {
+  source = "./../../modules/cross-account-roles"
+  
+  project_name = var.project_name
+  env          = var.env
+  account_type = "workload"
+  
+  # This role will be used to access the shared account resources
+  github_actions_role_arn = module.github_oidc.role_arn
+  shared_role_arn         = var.shared_role_arn
+  
+  tags = var.tags
+}
+
+# Add GitHub OIDC provider module
+module "github_oidc" {
+  source = "./../../modules/github-oidc"
+  
+  project_name = var.project_name
+  env          = var.env
+  github_org   = var.github_org
+  github_repo  = var.github_repo
+  account_type = "workload"
+  
+  # Allow GitHub Actions to assume the cross-account role
+  cross_account_roles = [module.cross_account_roles.role_arn]
+  
   tags = var.tags
 }

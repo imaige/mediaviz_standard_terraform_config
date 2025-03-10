@@ -31,14 +31,14 @@ terraform {
 provider "aws" {
   region = var.aws_region
 
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.env
-      Terraform   = "true"
-      ManagedBy   = "terraform"
-    }
-  }
+  # default_tags {
+  #   tags = {
+  #     Project     = var.project_name
+  #     Environment = var.env
+  #     Terraform   = "true"
+  #     ManagedBy   = "terraform"
+  #   }
+  # }
 }
 
 provider "kubernetes" {

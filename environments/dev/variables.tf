@@ -159,3 +159,24 @@ variable "project_name" {
 #   description = "Encrypted environment variable for Lambda function"
 #   type        = string
 # }
+
+variable "shared_account_id" {
+  description = "AWS account ID for shared services"
+  type        = string
+}
+
+variable "github_org" {
+  description = "GitHub organization name"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository name"
+  type        = string
+}
+
+variable "shared_role_arn" {
+  description = "ARN of the role in the shared account to assume"
+  type        = string
+  default     = ""
+}
