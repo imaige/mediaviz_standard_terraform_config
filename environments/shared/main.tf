@@ -4,17 +4,18 @@
 data "aws_caller_identity" "current" {}
 
 # Create KMS key for encryption
+# shared/main.tf
 module "security" {
   source = "./../../modules/security"
 
   project_name = var.project_name
   env          = "shared"
+  enable_sso   = false
   
-  # These parameters are required but create a circular dependency
-  # Since we're in the shared account, we can set placeholder values initially
-  kms_key_arn  = ""  # This will be replaced with the actual value after first apply
-  kms_key_id   = ""  # This will be replaced with the actual value after first apply
-  cluster_name = "shared-placeholder"  # The shared account likely doesn't have an EKS cluster
+  # Use a placeholder ARN or "*" for KMS until the real one exists
+  kms_key_arn  = "*"  # This will allow access to any KMS key for now
+  kms_key_id   = ""
+  cluster_name = "shared-placeholder"
   
   tags = var.tags
 }

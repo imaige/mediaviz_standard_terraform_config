@@ -3,15 +3,20 @@
 # Get the SSO admin instance
 data "aws_ssoadmin_instances" "this" {}
 
-# Create admin group
+
+# Create admin group conditionally
 resource "aws_identitystore_group" "eks_admins" {
-  display_name = "${var.project_name}-${var.env}-eks-admins"
-  description  = "EKS administrators group"
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
+  
+  display_name      = "${var.project_name}-${var.env}-eks-admins"
+  description       = "EKS administrators group"
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
 }
 
-# Get existing user from Identity Store
+# Get existing user from Identity Store conditionally
 data "aws_identitystore_user" "dmitrii" {
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
+  
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
   
   alternate_identifier {
@@ -22,22 +27,26 @@ data "aws_identitystore_user" "dmitrii" {
   }
 }
 
-# Add user to the group
+# Add user to the group conditionally
 resource "aws_identitystore_group_membership" "dmitrii" {
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
+  
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
-  group_id         = aws_identitystore_group.eks_admins.group_id
-  member_id        = data.aws_identitystore_user.dmitrii.user_id
+  group_id          = aws_identitystore_group.eks_admins[0].group_id
+  member_id         = data.aws_identitystore_user.dmitrii[0].user_id
 }
 
-# Create permission set for EKS admins
+# Create permission set conditionally
 resource "aws_ssoadmin_permission_set" "eks_admin" {
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
+  
   name             = "eks-admin-${var.env}"
   description      = "EKS administrator permissions for ${var.project_name}"
   instance_arn     = tolist(data.aws_ssoadmin_instances.this.arns)[0]
   session_duration = "PT8H"
 }
 
-# Create an IAM role for EKS admins
+# Create an IAM role for EKS admins - this doesn't depend on SSO
 resource "aws_iam_role" "eks_admin" {
   name = "${var.project_name}-${var.env}-eks-admin"
 
@@ -56,7 +65,7 @@ resource "aws_iam_role" "eks_admin" {
         Principal = {
           AWS = [
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
-            aws_iam_role.github_actions.arn  # Add GitHub Actions role as a trusted entity
+            aws_iam_role.github_actions.arn
           ]
         }
         Action = "sts:AssumeRole"
@@ -69,18 +78,13 @@ resource "aws_iam_role" "eks_admin" {
   })
 }
 
-# Add EKS admin permissions
+# Add EKS admin permissions - this doesn't depend on SSO
 resource "aws_iam_role_policy_attachment" "eks_admin_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
   role       = aws_iam_role.eks_admin.name
 }
 
-# resource "aws_iam_role_policy_attachment" "eks_admin_console" {
-#   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSConsoleFullAccess"
-#   role       = aws_iam_role.eks_admin.name
-# }
-
-# Create custom policy for additional EKS permissions
+# Create custom policy for additional EKS permissions - this doesn't depend on SSO
 resource "aws_iam_role_policy" "eks_admin_custom" {
   name = "${var.project_name}-${var.env}-eks-admin-custom"
   role = aws_iam_role.eks_admin.id
@@ -122,10 +126,12 @@ resource "aws_iam_role_policy" "eks_admin_custom" {
   })
 }
 
-# Add inline policy to permission set to allow assuming the EKS admin role
+# Add inline policy to permission set conditionally
 resource "aws_ssoadmin_permission_set_inline_policy" "eks_admin" {
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
+  
   instance_arn       = tolist(data.aws_ssoadmin_instances.this.arns)[0]
-  permission_set_arn = aws_ssoadmin_permission_set.eks_admin.arn
+  permission_set_arn = aws_ssoadmin_permission_set.eks_admin[0].arn
 
   inline_policy = jsonencode({
     Version = "2012-10-17"
@@ -143,19 +149,21 @@ resource "aws_ssoadmin_permission_set_inline_policy" "eks_admin" {
   })
 }
 
-# Assign the permission set to the group
+# Assign the permission set to the group conditionally
 resource "aws_ssoadmin_account_assignment" "eks_admin" {
+  count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
+  
   instance_arn       = tolist(data.aws_ssoadmin_instances.this.arns)[0]
-  permission_set_arn = aws_ssoadmin_permission_set.eks_admin.arn
+  permission_set_arn = aws_ssoadmin_permission_set.eks_admin[0].arn
 
-  principal_id   = aws_identitystore_group.eks_admins.group_id
+  principal_id   = aws_identitystore_group.eks_admins[0].group_id
   principal_type = "GROUP"
 
   target_id   = data.aws_caller_identity.current.account_id
   target_type = "AWS_ACCOUNT"
 }
 
-# Create OIDC Provider for GitHub
+# Create OIDC Provider for GitHub - this doesn't depend on SSO
 resource "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 
@@ -170,7 +178,7 @@ resource "aws_iam_openid_connect_provider" "github" {
   }
 }
 
-# Create IAM role for GitHub Actions
+# Create IAM role for GitHub Actions - this doesn't depend on SSO
 resource "aws_iam_role" "github_actions" {
   name = "${var.project_name}-${var.env}-github-actions"
 
@@ -200,7 +208,7 @@ resource "aws_iam_role" "github_actions" {
   }
 }
 
-# Add policy for ECR access
+# Add policy for ECR access - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_ecr" {
   name = "${var.project_name}-${var.env}-github-actions-ecr"
   role = aws_iam_role.github_actions.id
@@ -226,7 +234,7 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
   })
 }
 
-# Add policy for S3 access (for Helm charts)
+# Add policy for S3 access (for Helm charts) - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_s3" {
   name = "${var.project_name}-${var.env}-github-actions-s3"
   role = aws_iam_role.github_actions.id
@@ -251,7 +259,7 @@ resource "aws_iam_role_policy" "github_actions_s3" {
   })
 }
 
-# Add policy for KMS access
+# Add policy for KMS access - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_kms" {
   name = "${var.project_name}-${var.env}-github-actions-kms"
   role = aws_iam_role.github_actions.id
@@ -274,7 +282,7 @@ resource "aws_iam_role_policy" "github_actions_kms" {
   })
 }
 
-# Add policy for EKS access and Helm deployment
+# Add policy for EKS access and Helm deployment - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_eks" {
   name = "${var.project_name}-${var.env}-github-actions-eks"
   role = aws_iam_role.github_actions.id
@@ -308,7 +316,7 @@ resource "aws_iam_role_policy" "github_actions_eks" {
   })
 }
 
-# Add policy to allow assuming the EKS admin role
+# Add policy to allow assuming the EKS admin role - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_assume_eks_admin" {
   name = "${var.project_name}-${var.env}-github-actions-assume-eks-admin"
   role = aws_iam_role.github_actions.id
@@ -325,13 +333,7 @@ resource "aws_iam_role_policy" "github_actions_assume_eks_admin" {
   })
 }
 
-# Update EKS admin role trust policy to allow GitHub Actions
-# resource "aws_iam_role_policy_attachment" "eks_admin_trust_github" {
-#   policy_arn = aws_iam_role.eks_admin.arn
-#   role       = aws_iam_role.github_actions.name
-# }
-
-# Add necessary permissions for managing k8s resources
+# Add necessary permissions for managing k8s resources - this doesn't depend on SSO
 resource "aws_iam_role_policy" "github_actions_k8s" {
   name = "${var.project_name}-${var.env}-github-actions-k8s"
   role = aws_iam_role.github_actions.id

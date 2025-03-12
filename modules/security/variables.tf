@@ -20,3 +20,11 @@ variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
 }
+
+# modules/security/variables.tf
+# Add this variable
+variable "enable_sso" {
+  description = "Whether to enable AWS SSO resources"
+  type        = bool
+  default     = false
+}
