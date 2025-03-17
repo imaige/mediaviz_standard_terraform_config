@@ -1,23 +1,43 @@
-resource "aws_s3_bucket" "image_upload" {
-  bucket = "${var.project_name}-${var.env}-uploads"
+# modules/s3/main.tf
+
+locals {
+  # Normalize tags to lowercase to prevent case-sensitivity issues
+  normalized_tags = merge(
+    {
+      for key, value in var.tags :
+      lower(key) => value
+    },
+    {
+      environment = var.env
+      terraform   = "true"
+    }
+  )
   
-  tags = {
-    Environment = var.env
-    Terraform   = "true"
-  }
+  # Use bucket_suffix if provided, otherwise use default names
+  primary_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}" : "${var.project_name}-${var.env}-uploads"
+  logs_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-logs" : "${var.project_name}-${var.env}-uploads-logs"
+  processed_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-processed" : "${var.project_name}-${var.env}-processed"
+  helm_charts_bucket_name = var.helm_charts_bucket_name != "" ? var.helm_charts_bucket_name : "${var.project_name}-${var.env}-helm-charts"
 }
 
-# Enable versioning
-resource "aws_s3_bucket_versioning" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
+#-------------------------------------------------
+# Primary Upload Bucket
+#-------------------------------------------------
+resource "aws_s3_bucket" "primary" {
+  bucket = local.primary_bucket_name
+  
+  tags = local.normalized_tags
+}
+
+resource "aws_s3_bucket_versioning" "primary" {
+  bucket = aws_s3_bucket.primary.id
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-# Block public access
-resource "aws_s3_bucket_public_access_block" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
+resource "aws_s3_bucket_public_access_block" "primary" {
+  bucket = aws_s3_bucket.primary.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -25,9 +45,8 @@ resource "aws_s3_bucket_public_access_block" "image_upload" {
   restrict_public_buckets = true
 }
 
-# Enable server-side encryption
-resource "aws_s3_bucket_server_side_encryption_configuration" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "primary" {
+  bucket = aws_s3_bucket.primary.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -38,95 +57,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "image_upload" {
   }
 }
 
-# Enable access logging
-resource "aws_s3_bucket" "access_logs" {
-  bucket = "${var.project_name}-${var.env}-uploads-logs"
-}
-
-resource "aws_s3_bucket_versioning" "access_logs" {
-  bucket = aws_s3_bucket.access_logs.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# Add event notifications
-resource "aws_s3_bucket_notification" "access_logs_notification" {
-  bucket = aws_s3_bucket.access_logs.id
-  eventbridge = true
-}
-
-# Add encryption
-resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
-  bucket = aws_s3_bucket.access_logs.id
-  rule {
-    apply_server_side_encryption_by_default {
-      kms_master_key_id = var.kms_key_id
-      sse_algorithm     = "aws:kms"
-    }
-  }
-}
-
-# Add public access block
-resource "aws_s3_bucket_public_access_block" "access_logs" {
-  bucket = aws_s3_bucket.access_logs.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# Add lifecycle configuration
-resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
-  bucket = aws_s3_bucket.access_logs.id
-
-  rule {
-    id     = "cleanup"
-    status = "Enabled"
-
-    abort_incomplete_multipart_upload {
-      days_after_initiation = 7
-    }
-
-    expiration {
-      days = 365
-    }
-  }
-}
-
-# Add replication configuration (if needed)
-# resource "aws_s3_bucket_replication_configuration" "access_logs" {
-#   bucket = aws_s3_bucket.access_logs.id
-#   role   = aws_iam_role.replication_role.arn
-
-#   rule {
-#     id     = "replicate_all"
-#     status = "Enabled"
-
-#     destination {
-#       bucket = aws_s3_bucket.replica.arn
-#       encryption_configuration {
-#         replica_kms_key_id = var.replica_kms_key_id
-#       }
-#     }
-#   }
-# }
-
-resource "aws_s3_bucket_logging" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
-
-  target_bucket = aws_s3_bucket.access_logs.id
-  target_prefix = "log/"
-}
-
-resource "aws_s3_bucket_notification" "bucket_notification" {
-  bucket = aws_s3_bucket.image_upload.id
-
-  eventbridge = true
-}
-
-resource "aws_s3_bucket_cors_configuration" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
+resource "aws_s3_bucket_cors_configuration" "primary" {
+  bucket = aws_s3_bucket.primary.id
 
   cors_rule {
     allowed_headers = ["*"]
@@ -137,8 +69,8 @@ resource "aws_s3_bucket_cors_configuration" "image_upload" {
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "image_upload" {
-  bucket = aws_s3_bucket.image_upload.id
+resource "aws_s3_bucket_lifecycle_configuration" "primary" {
+  bucket = aws_s3_bucket.primary.id
 
   rule {
     id     = "cleanup"
@@ -154,137 +86,108 @@ resource "aws_s3_bucket_lifecycle_configuration" "image_upload" {
   }
 }
 
-# Enable replication (if needed)
-# resource "aws_s3_bucket_replication_configuration" "image_upload" {
-#   count = var.enable_replication ? 1 : 0
+resource "aws_s3_bucket_notification" "primary" {
+  bucket = aws_s3_bucket.primary.id
+  eventbridge = true
+}
+
+#-------------------------------------------------
+# Logging Bucket
+#-------------------------------------------------
+resource "aws_s3_bucket" "logs" {
+  bucket = local.logs_bucket_name
   
-#   bucket = aws_s3_bucket.image_upload.id
-#   role   = aws_iam_role.replication[0].arn
+  tags = local.normalized_tags
+}
 
-#   rule {
-#     id     = "replicate-all"
-#     status = "Enabled"
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
 
-#     destination {
-#       bucket = var.destination_bucket_arn
-#       encryption_configuration {
-#         replica_kms_key_id = var.destination_kms_key_arn
-#       }
-#     }
-#   }
-# }
+resource "aws_s3_bucket_notification" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  eventbridge = true
+}
 
-# resource "aws_s3_bucket" "replica" {
-#   bucket = "${var.project_name}-${var.env}-uploads-logs-replica"
+resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = var.kms_key_id
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
 
-#   tags = {
-#     Environment = var.env
-#     Terraform   = "true"
-#   }
-# }
+resource "aws_s3_bucket_public_access_block" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
 
-# Create IAM role for replication
-# resource "aws_iam_role" "replication_role" {
-#   name = "${var.project_name}-${var.env}-s3-replication-role"
+resource "aws_s3_bucket_lifecycle_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
 
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "s3.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
+  rule {
+    id     = "cleanup"
+    status = "Enabled"
 
-# Add replication policy to the role
-# resource "aws_iam_role_policy" "replication" {
-#   name = "${var.project_name}-${var.env}-s3-replication-policy"
-#   role = aws_iam_role.replication_role.id
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
 
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = [
-#           "s3:GetReplicationConfiguration",
-#           "s3:ListBucket"
-#         ]
-#         Effect = "Allow"
-#         Resource = [
-#           aws_s3_bucket.access_logs.arn
-#         ]
-#       },
-#       {
-#         Action = [
-#           "s3:GetObjectVersionForReplication",
-#           "s3:GetObjectVersionAcl",
-#           "s3:GetObjectVersionTagging"
-#         ]
-#         Effect = "Allow"
-#         Resource = [
-#           "${aws_s3_bucket.access_logs.arn}/*"
-#         ]
-#       },
-#       {
-#         Action = [
-#           "s3:ReplicateObject",
-#           "s3:ReplicateDelete",
-#           "s3:ReplicateTags"
-#         ]
-#         Effect = "Allow"
-#         Resource = [
-#           "${aws_s3_bucket.replica.arn}/*"
-#         ]
-#       }
-#     ]
-#   })
-# }
+    expiration {
+      days = 365
+    }
+  }
+}
 
-# Configure encryption for replica bucket
-# resource "aws_s3_bucket_server_side_encryption_configuration" "replica" {
-#   bucket = aws_s3_bucket.replica.id
+# Configure primary bucket to use log bucket
+resource "aws_s3_bucket_logging" "primary" {
+  bucket = aws_s3_bucket.primary.id
 
-#   rule {
-#     apply_server_side_encryption_by_default {
-#       kms_master_key_id = var.kms_key_id
-#       sse_algorithm     = "aws:kms"
-#     }
-#   }
-# }
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "log/"
+}
 
-# Block public access for replica bucket
-# resource "aws_s3_bucket_public_access_block" "replica" {
-#   bucket = aws_s3_bucket.replica.id
-
-#   block_public_acls       = true
-#   block_public_policy     = true
-#   ignore_public_acls      = true
-#   restrict_public_buckets = true
-# }
-
-# Add versioning for replica bucket
-# resource "aws_s3_bucket_versioning" "replica" {
-#   bucket = aws_s3_bucket.replica.id
-#   versioning_configuration {
-#     status = "Enabled"
-#   }
-# }
-
-# resource "aws_s3_bucket_logging" "replica" {
-#   bucket = aws_s3_bucket.replica.id
-
-#   target_bucket = aws_s3_bucket.access_logs.id
-#   target_prefix = "log/"
-# }
-
-# Processed images bucket
+#-------------------------------------------------
+# Processed Images Bucket
+#-------------------------------------------------
 resource "aws_s3_bucket" "processed" {
-  bucket = "${var.project_name}-${var.env}-processed"
+  bucket = local.processed_bucket_name
+  
+  tags = local.normalized_tags
+}
+
+resource "aws_s3_bucket_versioning" "processed" {
+  bucket = aws_s3_bucket.processed.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "processed" {
+  bucket = aws_s3_bucket.processed.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "processed" {
+  bucket = aws_s3_bucket.processed.id
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = var.kms_key_arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
 }
 
 resource "aws_s3_bucket_cors_configuration" "processed" {
@@ -316,17 +219,27 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed" {
   }
 }
 
-# Helm charts bucket
-resource "aws_s3_bucket" "helm_charts" {
-  bucket = "${var.project_name}-${var.env}-helm-charts"
-  
-  tags = {
-    Environment = var.env
-    Terraform   = "true"
-  }
+resource "aws_s3_bucket_logging" "processed" {
+  bucket = aws_s3_bucket.processed.id
+
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "processed-log/"
 }
 
-# Enable versioning for helm charts bucket
+resource "aws_s3_bucket_notification" "processed" {
+  bucket = aws_s3_bucket.processed.id
+  eventbridge = true
+}
+
+#-------------------------------------------------
+# Helm Charts Bucket
+#-------------------------------------------------
+resource "aws_s3_bucket" "helm_charts" {
+  bucket = local.helm_charts_bucket_name
+  
+  tags = local.normalized_tags
+}
+
 resource "aws_s3_bucket_versioning" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
   versioning_configuration {
@@ -334,7 +247,6 @@ resource "aws_s3_bucket_versioning" "helm_charts" {
   }
 }
 
-# Block public access
 resource "aws_s3_bucket_public_access_block" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
 
@@ -344,7 +256,6 @@ resource "aws_s3_bucket_public_access_block" "helm_charts" {
   restrict_public_buckets = true
 }
 
-# Enable server-side encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
 
@@ -357,7 +268,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "helm_charts" {
   }
 }
 
-# Add lifecycle configuration
 resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
 
@@ -376,16 +286,40 @@ resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
   }
 }
 
-# Enable logging for helm charts bucket
 resource "aws_s3_bucket_logging" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
 
-  target_bucket = aws_s3_bucket.access_logs.id
+  target_bucket = aws_s3_bucket.logs.id
   target_prefix = "helm-charts-log/"
 }
 
-# Enable EventBridge notifications
-resource "aws_s3_bucket_notification" "helm_charts_notification" {
+resource "aws_s3_bucket_notification" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
   eventbridge = true
+}
+
+# Cross-account access policy for Helm charts bucket
+resource "aws_s3_bucket_policy" "helm_charts" {
+  count  = 1
+  bucket = aws_s3_bucket.helm_charts.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::054037110591:root"  # Use a known valid ARN
+        },
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          aws_s3_bucket.helm_charts.arn,
+          "${aws_s3_bucket.helm_charts.arn}/*"
+        ]
+      }
+    ]
+  })
 }

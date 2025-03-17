@@ -62,3 +62,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "workload_environments" {
+  description = "List of environment names corresponding to workload account IDs"
+  type        = list(string)
+  default     = ["qa", "dev", "prod"]  # Must be in same order as workload_account_ids values
+}

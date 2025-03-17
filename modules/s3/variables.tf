@@ -4,33 +4,58 @@ variable "project_name" {
 }
 
 variable "env" {
-  description = "Environment (dev, prod, etc)"
+  description = "Environment (dev, qa, prod, shared)"
+  type        = string
+}
+
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for S3 encryption"
+  type        = string
+}
+
+variable "kms_key_id" {
+  description = "ID of the KMS key for S3 encryption"
   type        = string
 }
 
 variable "cors_allowed_origins" {
-  description = "List of allowed origins for CORS"
+  description = "List of origins allowed for CORS"
   type        = list(string)
   default     = ["*"]
 }
 
 variable "retention_days" {
-  description = "Number of days to retain objects"
+  description = "Number of days to retain objects before deletion"
   type        = number
   default     = 30
 }
 
-variable "kms_key_arn" {
-  description = "ARN of the KMS key for encryption"
-  type        = string
+variable "cross_account_arns" {
+  description = "List of ARNs for cross-account access (read-only)"
+  type        = list(string)
+  default     = []
 }
 
-variable "kms_key_id" {
-  description = "KMS key ID for encryption"
-  type        = string
+variable "ci_cd_role_arns" {
+  description = "List of CI/CD role ARNs for read/write access"
+  type        = list(string)
+  default     = []
 }
 
-variable "replica_kms_key_id" {
-  description = "KMS key ID for replica bucket encryption"
+variable "tags" {
+  description = "A map of tags to add to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+variable "bucket_suffix" {
+  description = "Suffix to add to bucket names for uniqueness"
   type        = string
+  default     = ""
+}
+
+variable "helm_charts_bucket_name" {
+  description = "Custom name for the Helm charts bucket"
+  type        = string
+  default     = ""
 }

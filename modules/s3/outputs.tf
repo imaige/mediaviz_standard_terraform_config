@@ -1,22 +1,42 @@
+#-------------------------------------------------
+# Module Outputs
+#-------------------------------------------------
 output "bucket_id" {
-  description = "The ID of the S3 bucket"
-  value       = aws_s3_bucket.image_upload.id
+  description = "ID of the primary S3 bucket"
+  value       = aws_s3_bucket.primary.id
 }
 
 output "bucket_arn" {
-  description = "The ARN of the S3 bucket"
-  value       = aws_s3_bucket.image_upload.arn
+  description = "ARN of the primary S3 bucket"
+  value       = aws_s3_bucket.primary.arn
 }
 
-output "bucket_domain_name" {
-  description = "The domain name of the S3 bucket"
-  value       = aws_s3_bucket.image_upload.bucket_domain_name
+output "logs_bucket_id" {
+  description = "ID of the logs S3 bucket"
+  value       = aws_s3_bucket.logs.id
+}
+
+output "logs_bucket_arn" {
+  description = "ARN of the logs S3 bucket"
+  value       = aws_s3_bucket.logs.arn
 }
 
 output "processed_bucket_id" {
-  value = aws_s3_bucket.processed.id
+  description = "ID of the processed images S3 bucket"
+  value       = aws_s3_bucket.processed.id
 }
 
 output "processed_bucket_arn" {
-  value = aws_s3_bucket.processed.arn
+  description = "ARN of the processed images S3 bucket"
+  value       = aws_s3_bucket.processed.arn
+}
+
+output "helm_charts_bucket_id" {
+  description = "ID of the Helm charts S3 bucket"
+  value       = aws_s3_bucket.helm_charts.id
+}
+
+output "helm_charts_bucket_arn" {
+  description = "ARN of the Helm charts S3 bucket"
+  value       = aws_s3_bucket.helm_charts.arn
 }

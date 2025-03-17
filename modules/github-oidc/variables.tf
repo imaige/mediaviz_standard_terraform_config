@@ -41,3 +41,40 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# Add these to your existing variables.tf file
+
+variable "aws_region" {
+  description = "AWS region where resources are deployed"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "aws_account_id" {
+  description = "AWS account ID where resources are deployed"
+  type        = string
+}
+
+variable "kms_key_arns" {
+  description = "List of KMS key ARNs that GitHub Actions needs access to"
+  type        = list(string)
+  default     = []
+}
+
+variable "shared_ecr_arns" {
+  description = "List of ECR repository ARNs in the shared account"
+  type        = list(string)
+  default     = []
+}
+
+variable "shared_s3_arns" {
+  description = "List of S3 bucket ARNs in the shared account"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_cicd_permissions" {
+  description = "Enable additional permissions for CI/CD workflows"
+  type        = bool
+  default     = false
+}

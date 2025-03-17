@@ -1,26 +1,38 @@
 # lambda_processors/main.tf
 
 locals {
-  # Update mapping to match what Lambda sends
   lambda_functions = {
-    "l-blur-model"               = "blur_model"               # Base model name without _processing
+    "l-blur-model"               = "blur_model"
     "l-colors-model"             = "colors_model"
     "l-image-comparison-model"   = "image_comparison_model"
     "l-facial-recognition-model" = "face_recognition_model"
   }
+  
+  # Normalize tags for consistency
+  normalized_tags = merge(var.tags, {
+    Environment = var.env
+    Project     = var.project_name
+    ManagedBy   = "terraform"
+  })
+  
+  # Use shared repository URL if provided, else use account's own
+  repository_base_url = var.shared_ecr_repository_url != "" ? var.shared_ecr_repository_url : var.ecr_repository_url
 }
 
 resource "aws_lambda_function" "processor" {
   for_each = local.lambda_functions
 
   function_name = "${var.project_name}-${var.env}-${each.key}"
-  role         = aws_iam_role.processor_role_new[each.key].arn
+  role          = aws_iam_role.processor_role[each.key].arn
   
   package_type = "Image"
-  image_uri    = "${var.ecr_repository_url}-${each.key}:latest"
+  image_uri    = "${local.repository_base_url}-${each.key}:latest"
 
   memory_size = var.memory_size
   timeout     = var.timeout
+  
+  # Optional reserved concurrency
+  reserved_concurrent_executions = var.reserved_concurrency > 0 ? var.reserved_concurrency : null
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -28,12 +40,14 @@ resource "aws_lambda_function" "processor" {
   }
 
   environment {
-    variables = {
+    variables = merge({
       ENVIRONMENT     = var.env
       DB_SECRET_ARN   = var.aurora_secret_arn
       DB_CLUSTER_ARN  = var.aurora_cluster_arn
       DB_NAME         = var.aurora_database_name
-    }
+      MODEL_TYPE      = each.value
+      AWS_REGION      = var.aws_region
+    }, var.additional_environment_variables)
   }
 
   dead_letter_config {
@@ -44,11 +58,11 @@ resource "aws_lambda_function" "processor" {
     mode = "Active"
   }
 
-  # Use only standard_tags + model
-  tags = {
-    name        = "${var.project_name}-${var.env}-${each.key}"
-    environment = var.env
-  }
+  tags = merge(local.normalized_tags, {
+    Name    = "${var.project_name}-${var.env}-${each.key}"
+    Model   = each.key
+    Service = "lambda-processor"
+  })
 
   lifecycle {
     create_before_destroy = true
@@ -57,7 +71,7 @@ resource "aws_lambda_function" "processor" {
     ]
   }
 
-  depends_on = [aws_iam_role.processor_role_new]
+  depends_on = [aws_iam_role.processor_role]
 }
 
 resource "aws_security_group" "processor_sg" {
@@ -83,19 +97,17 @@ resource "aws_security_group" "processor_sg" {
     security_groups = [var.aurora_security_group_id]
   }
 
-  # Use only standard_tags + model
-  tags = {
-    name        = "${var.project_name}-${var.env}-${each.key}"
-    environment = var.env
-  }
+  tags = merge(local.normalized_tags, {
+    Name  = "${var.project_name}-${var.env}-${each.key}-sg"
+    Model = each.key
+  })
 
-  # Add lifecycle policy to help with deletion
   lifecycle {
     create_before_destroy = true
   }
 }
 
-resource "aws_iam_role" "processor_role_new" {
+resource "aws_iam_role" "processor_role" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-role"
@@ -111,23 +123,23 @@ resource "aws_iam_role" "processor_role_new" {
     }]
   })
 
-  # tags = {
-  #   name        = "${var.project_name}-${var.env}-${each.key}"
-  #   environment = var.env
-  # }
+  tags = merge(local.normalized_tags, {
+    Name  = "${var.project_name}-${var.env}-${each.key}-role"
+    Model = each.key
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "basic_execution" {
   for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role_new[each.key].name
+  role       = aws_iam_role.processor_role[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "vpc_access" {
   for_each = local.lambda_functions
 
-  role       = aws_iam_role.processor_role_new[each.key].name
+  role       = aws_iam_role.processor_role[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
@@ -135,7 +147,7 @@ resource "aws_iam_role_policy" "sqs_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-sqs-policy"
-  role = aws_iam_role.processor_role_new[each.key].id
+  role = aws_iam_role.processor_role[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -148,7 +160,7 @@ resource "aws_iam_role_policy" "sqs_policy" {
           "sqs:GetQueueAttributes",
           "sqs:ChangeMessageVisibility"
         ]
-        Resource = var.sqs_queues[each.key]  # Changed from var.sqs_queue_arn
+        Resource = var.sqs_queues[each.key]
       },
       {
         Effect = "Allow"
@@ -166,7 +178,7 @@ resource "aws_iam_role_policy" "aurora_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-aurora-policy"
-  role = aws_iam_role.processor_role_new[each.key].id
+  role = aws_iam_role.processor_role[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -190,7 +202,7 @@ resource "aws_iam_role_policy" "aurora_policy" {
         ]
         Resource = [
           var.aurora_secret_arn,
-          var.aurora_kms_key_arn  # Add this variable if not already defined
+          var.aurora_kms_key_arn
         ]
       }
     ]
@@ -201,7 +213,7 @@ resource "aws_iam_role_policy" "ecr_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-ecr-policy"
-  role = aws_iam_role.processor_role_new[each.key].id
+  role = aws_iam_role.processor_role[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -214,6 +226,11 @@ resource "aws_iam_role_policy" "ecr_policy" {
           "ecr:BatchCheckLayerAvailability"
         ]
         Resource = var.ecr_repository_arns
+      },
+      {
+        Effect = "Allow"
+        Action = "ecr:GetAuthorizationToken"
+        Resource = "*"
       }
     ]
   })
@@ -223,7 +240,7 @@ resource "aws_iam_role_policy" "s3_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-s3-policy"
-  role = aws_iam_role.processor_role_new[each.key].id
+  role = aws_iam_role.processor_role[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -233,13 +250,12 @@ resource "aws_iam_role_policy" "s3_policy" {
         Action = [
           "s3:GetObject",
           "s3:ListBucket",
-          "s3:GetObjectVersion",
-          "s3:ListAllMyBuckets"
+          "s3:GetObjectVersion"
         ]
-        Resource = [
-          "arn:aws:s3:::*",
-          "arn:aws:s3:::*/*"
-        ]
+        Resource = concat(
+          var.s3_bucket_arns,
+          [for bucket in var.s3_bucket_arns : "${bucket}/*"]
+        )
       }
     ]
   })
@@ -250,32 +266,22 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 
   event_source_arn = var.sqs_queues[each.key]
   function_name    = aws_lambda_function.processor[each.key].arn
-  batch_size       = 1
-  maximum_batching_window_in_seconds = 0  # Set to 0 to process immediately
-  enabled          = true               # Explicitly enable the mapping
+  batch_size       = var.batch_size
+  maximum_batching_window_in_seconds = var.batch_window
+  enabled          = true
   
   scaling_config {
-    maximum_concurrency = 1000             # Start with lower concurrency
+    maximum_concurrency = var.max_concurrency
   }
 
   function_response_types = ["ReportBatchItemFailures"]
-
-  # Add filter criteria to match EventBridge events
-  # filter_criteria {
-  #   filter {
-  #     pattern = jsonencode({
-  #       detail-type = ["${each.value}_processing"]  # Match the processing suffix
-  #       source     = ["custom.imageUpload"]
-  #     })
-  #   }
-  # }
 }
 
 resource "aws_iam_role_policy" "rekognition_policy" {
   for_each = local.lambda_functions
 
   name = "${var.project_name}-${var.env}-${each.key}-rekognition-policy"
-  role = aws_iam_role.processor_role_new[each.key].id  # Changed from processor_role to processor_role_new
+  role = aws_iam_role.processor_role[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -283,11 +289,13 @@ resource "aws_iam_role_policy" "rekognition_policy" {
       {
         Effect = "Allow"
         Action = [
-          "rekognition:DetectFaces"
+          "rekognition:DetectFaces",
+          "rekognition:DetectLabels",
+          "rekognition:DetectModerationLabels",
+          "rekognition:CompareFaces"
         ]
         Resource = "*"
       }
     ]
   })
 }
-

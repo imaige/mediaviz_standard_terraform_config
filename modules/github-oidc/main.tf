@@ -68,14 +68,7 @@ resource "aws_iam_role_policy" "github_actions_base" {
       {
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:PutImage"
+          "ecr:GetAuthorizationToken"
         ]
         Resource = "*"
       }
@@ -99,13 +92,42 @@ resource "aws_iam_role_policy" "account_specific" {
             "s3:ListBucket",
             "s3:GetObject",
             "s3:PutObject",
-            "ecr:*"
+            "s3:DeleteObject"
           ]
-          Resource = "*"  # Scope this down to specific resources
+          Resource = [
+            "arn:aws:s3:::${var.project_name}-${var.env}-helm-charts",
+            "arn:aws:s3:::${var.project_name}-${var.env}-helm-charts/*"
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage",
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:PutImage",
+            "ecr:InitiateLayerUpload",
+            "ecr:UploadLayerPart",
+            "ecr:CompleteLayerUpload",
+            "ecr:DescribeRepositories",
+            "ecr:ListImages"
+          ]
+          Resource = [
+            "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-${var.env}-*"
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt",
+            "kms:GenerateDataKey*",
+            "kms:DescribeKey"
+          ]
+          Resource = length(var.kms_key_arns) > 0 ? var.kms_key_arns : ["*"]
         }
       ] : [],
       
-      # Workload account specific permissions
+      # Workload account permissions for EKS and Lambda
       var.account_type == "workload" ? [
         {
           Effect = "Allow"
@@ -115,10 +137,90 @@ resource "aws_iam_role_policy" "account_specific" {
             "lambda:UpdateFunctionCode",
             "lambda:GetFunction"
           ]
-          Resource = "*"  # Scope this down to specific resources
+          Resource = "*"
+        }
+      ] : [],
+      
+      # Workload account permissions for ECR
+      var.account_type == "workload" && length(var.shared_ecr_arns) > 0 ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "ecr:BatchGetImage",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchCheckLayerAvailability"
+          ]
+          Resource = var.shared_ecr_arns
+        }
+      ] : [],
+      
+      # Workload account permissions for S3
+      var.account_type == "workload" && length(var.shared_s3_arns) > 0 ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ]
+          Resource = var.shared_s3_arns
+        }
+      ] : [],
+      
+      # Workload account permissions for KMS
+      var.account_type == "workload" && length(var.kms_key_arns) > 0 ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt",
+            "kms:DescribeKey"
+          ]
+          Resource = var.kms_key_arns
         }
       ] : []
     )
+  })
+}
+
+# Enhanced permissions for CI/CD workflows
+resource "aws_iam_role_policy" "cicd_workflow" {
+  count = var.enable_cicd_permissions ? 1 : 0
+  name  = "${var.project_name}-${var.env}-github-actions-cicd"
+  role  = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = var.account_type == "shared" ? ["arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-${var.env}-*"] : var.shared_ecr_arns
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunction",
+          "lambda:UpdateFunctionConfiguration"
+        ]
+        Resource = var.account_type == "workload" ? ["arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.project_name}-${var.env}-*"] : []
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster",
+          "eks:ListClusters"
+        ]
+        Resource = var.account_type == "workload" ? ["arn:aws:eks:${var.aws_region}:${var.aws_account_id}:cluster/${var.project_name}-${var.env}"] : []
+      }
+    ]
   })
 }
 
