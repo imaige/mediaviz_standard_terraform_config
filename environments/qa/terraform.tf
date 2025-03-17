@@ -5,6 +5,7 @@ terraform {
     region         = "us-east-1"
     dynamodb_table = "mediaviz-terraform-backend-config-qa"
     encrypt        = true
+    profile = "shared-services"
   }
 
   required_providers {
@@ -30,6 +31,7 @@ terraform {
 # Provider configurations
 provider "aws" {
   region = var.aws_region
+  profile = "shared-services"
 
   default_tags {
     tags = {

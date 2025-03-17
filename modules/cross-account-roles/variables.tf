@@ -1,5 +1,3 @@
-# modules/cross-account-roles/variables.tf
-
 variable "project_name" {
   description = "Name of the project"
   type        = string
@@ -54,6 +52,24 @@ variable "shared_role_arn" {
   description = "ARN of the role in the shared account to assume"
   type        = string
   default     = ""
+}
+
+variable "kms_key_arns" {
+  description = "List of KMS key ARNs for encryption/decryption"
+  type        = list(string)
+  default     = []
+}
+
+variable "cicd_principal_arns" {
+  description = "List of CI/CD principal ARNs that need enhanced access"
+  type        = list(string)
+  default     = []
+}
+
+variable "additional_principal_arns" {
+  description = "List of additional IAM principal ARNs that can assume the workload role"
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {

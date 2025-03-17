@@ -72,3 +72,15 @@ variable "aurora_database_name" {
   description = "Name of the Aurora database"
   type        = string
 }
+
+variable "cross_account_arns" {
+  description = "List of ARNs for cross-account access to ECR repositories"
+  type        = list(string)
+  default     = []
+}
+
+variable "s3_bucket_arns" {
+  description = "List of S3 bucket ARNs that the models need access to"
+  type        = list(string)
+  default     = []
+}

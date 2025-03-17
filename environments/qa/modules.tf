@@ -1,3 +1,17 @@
+# Data sources
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# Access shared account state (Assumes remote state is already configured)
+data "terraform_remote_state" "shared" {
+  backend = "s3"
+  config = {
+    bucket = "mediaviz-terraform-state"
+    key    = "shared/terraform.tfstate"
+    region = "us-east-1"  # Use variable instead
+  }
+}
+
 # Existing Infrastructure
 module "vpc" {
   source = "./../../modules/networking"
@@ -6,12 +20,27 @@ module "vpc" {
   env          = var.env
 }
 
+module "security" {
+  source = "./../../modules/security"
+
+  project_name = var.project_name
+  env          = var.env
+  kms_key_arn  = null  # Will be created by the module
+  kms_key_id   = null  # Will be created by the module
+  cluster_name = var.cluster_name  # Reference before creation, will be updated
+  enable_sso   = false
+  
+  tags = var.tags
+}
+
 module "eks" {
   source = "./../../modules/eks"
 
+  project_name    = var.project_name
   cluster_name    = var.cluster_name
   env             = var.env
   cluster_version = var.cluster_version
+  aws_region      = data.aws_region.current.name
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
@@ -21,11 +50,32 @@ module "eks" {
   node_group_min_size       = var.node_group_min_size
   node_group_max_size       = var.node_group_max_size
   node_group_desired_size   = var.node_group_desired_size
+  
+  # Use GPU instance types variable
+  gpu_instance_types       = var.gpu_instance_types
+  gpu_node_min_size        = var.gpu_node_min_size
+  gpu_node_max_size        = var.gpu_node_max_size
+  gpu_node_desired_size    = var.gpu_node_desired_size
 
-  aws_account_id     = var.aws_account_id
+  aws_account_id     = data.aws_caller_identity.current.account_id
   kms_key_arn        = module.security.kms_key_arn
-  kms_key_id         = module.security.kms_key_id
   eks_admin_role_arn = module.security.eks_admin_role_arn
+  
+  # Add SQS, S3, and Aurora access
+  sqs_queue_arns = values(module.sqs.lambda_queue_arns)
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    "${module.s3.bucket_arn}/*"
+  ]
+  aurora_cluster_arns = [module.aurora.cluster_arn]
+  
+  # Cross account access
+  enable_shared_access = true
+  shared_access_role_arn = module.cross_account_roles.role_arn
+  
+  install_nvidia_plugin = true
+  
+  tags = var.tags
 }
 
 # New Serverless Infrastructure
@@ -38,7 +88,9 @@ module "s3" {
   retention_days       = var.retention_days
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
-  replica_kms_key_id   = module.security.kms_key_id
+  cross_account_arns   = []  # No cross-account access needed for this bucket
+  
+  tags = var.tags
 }
 
 module "lambda_upload" {
@@ -69,15 +121,24 @@ module "lambda_processors" {
 
   project_name = var.project_name
   env          = var.env
+  aws_region   = data.aws_region.current.name
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
 
-  # ECR configurations 
-  ecr_repository_url  = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.env}"
-  ecr_repository_arns = values(module.ecr.repository_arns)
+  # ECR configurations - use shared account repositories
+  ecr_repository_url  = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${var.project_name}-${var.env}"
+  shared_ecr_repository_url = "${data.terraform_remote_state.shared.outputs.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${var.project_name}-shared"
+  ecr_repository_arns = local.shared_ecr_repository_arns
+  
+  # S3 buckets that Lambda needs access to
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    # Access to shared account helm charts bucket
+    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn
+  ]
 
-  # SQS configurations - use the map of queue ARNs
+  # SQS configurations 
   sqs_queues = {
     l-blur-model               = module.sqs.lambda_queue_arns["lambda-blur-model"]
     l-colors-model             = module.sqs.lambda_queue_arns["lambda-colors-model"]
@@ -93,6 +154,11 @@ module "lambda_processors" {
   aurora_security_group_id = module.aurora.security_group_id
   aurora_kms_key_arn       = module.aurora.kms_key_arn
 
+  # Lambda scaling and concurrency
+  batch_size       = 1
+  batch_window     = 0
+  max_concurrency  = 10
+  
   tags = var.tags
 }
 
@@ -106,6 +172,7 @@ module "api_gateway" {
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
   waf_acl_arn          = module.security.waf_acl_arn
+  
 }
 
 module "eventbridge" {
@@ -148,7 +215,6 @@ module "sqs" {
   lambda_role_arns = module.lambda_processors.all_role_arns
   eks_role_arn     = module.eks.node_group_role_arn
 
-
   # Optional: Module-specific configurations
   model_specific_config = {
     "lambda-module1" = {
@@ -167,22 +233,8 @@ module "sqs" {
   tags = var.tags
 }
 
-module "security" {
-  source = "./../../modules/security"
-
-  project_name = var.project_name
-  env          = var.env
-  kms_key_arn  = module.security.kms_key_arn
-  kms_key_id   = module.security.kms_key_id
-  # eks_node_role_arn = module.eks.eks_managed_node_role_arn
-  tags = var.tags
-  cluster_name = module.eks.cluster_name
-
-}
-
 module "eks_functions" {
   source = "./../../modules/eks_functions"
-
 }
 
 module "aurora" {
@@ -212,38 +264,24 @@ module "bastion" {
   env              = var.env
   vpc_id           = module.vpc.vpc_id
   public_subnet_id = module.vpc.public_subnets[0]
-  allowed_ips = [
-    "24.5.226.154/32",
-    "73.169.81.101/32",
-    "67.241.163.178/32",
-    "76.155.77.153/32",
-    "136.29.106.130/32",
-    "67.162.158.188/32",
-    "136.36.145.192/32",
-    "135.129.132.20/32"
-  ]
-  aurora_endpoint = module.aurora.cluster_endpoint
-  tags            = var.tags
-}
-
-module "ecr" {
-  source = "./../../modules/ecr"
-
-  project_name = var.project_name
-  env          = var.env
-  kms_key_arn  = module.security.kms_key_arn
-
-  cross_account_arns = [] # Add any cross-account ARNs if needed
-
+  allowed_ips      = var.bastion_allowed_ips
+  aurora_endpoint  = module.aurora.cluster_endpoint
+  
   tags = var.tags
 }
+
+# Remove the ECR module in workload accounts - use shared account ECR instead
+# module "ecr" {
+#   source = "./../../modules/ecr"
+#   ...
+# }
 
 module "eks_processors" {
   source = "./../../modules/eks_processors"
 
   project_name = var.project_name
   env          = var.env
-  aws_region   = var.aws_region
+  aws_region   = data.aws_region.current.name
 
   aurora_cluster_arn   = module.aurora.cluster_arn
   aurora_secret_arn    = module.aurora.secret_arn
@@ -261,6 +299,97 @@ module "eks_processors" {
   kms_key_arn       = module.security.kms_key_arn
   oidc_provider     = module.eks.oidc_provider
   oidc_provider_arn = module.eks.oidc_provider_arn
+  
+  # Add cross-account access for ECR
+  cross_account_arns = [
+    data.terraform_remote_state.shared.outputs.cross_account_role_arn
+  ]
+  
+  # Reference shared S3 bucket
+  s3_bucket_arns = [
+    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
+    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+  ]
 
   tags = var.tags
+}
+
+module "cross_account_roles" {
+  source = "../../modules/cross-account-roles"
+  
+  project_name = var.project_name
+  account_type = "workload"
+  env          = var.env
+  
+  # Use OIDC provider ARN from GitHub Actions
+  github_actions_role_arn = module.github_oidc.role_arn
+  
+  # Reference shared account role using remote state
+  shared_role_arn = data.terraform_remote_state.shared.outputs.cross_account_role_arn
+  
+  # Access specific ECR repositories
+  ecr_repository_arns = [
+    for repo in var.shared_ecr_repositories : 
+    "arn:aws:ecr:${data.aws_region.current.name}:${data.terraform_remote_state.shared.outputs.account_id}:repository/${var.project_name}-shared-${repo}"
+  ]
+  
+  # Access shared S3 buckets
+  s3_bucket_arns = [
+    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
+    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+  ]
+  
+  # Add KMS keys
+  kms_key_arns = [
+    data.terraform_remote_state.shared.outputs.kms_key_arn
+  ]
+  
+  tags = var.tags
+}
+
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+  
+  project_name = var.project_name
+  env          = var.env
+  github_org   = var.github_org
+  github_repo  = var.github_repo
+  account_type = "workload"
+  aws_region   = data.aws_region.current.name
+  aws_account_id = data.aws_caller_identity.current.account_id
+  
+  # Add KMS key ARNs
+  kms_key_arns = [module.security.kms_key_arn]
+  
+  # Access to shared ECR repositories
+  shared_ecr_arns = [
+    for repo in var.shared_ecr_repositories : 
+    "arn:aws:ecr:${data.aws_region.current.name}:${data.terraform_remote_state.shared.outputs.account_id}:repository/${var.project_name}-shared-${repo}"
+  ]
+  
+  # Access to shared S3 buckets
+  shared_s3_arns = [
+    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
+    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+  ]
+  
+  # Cross-account role to assume
+  cross_account_roles = [
+    data.terraform_remote_state.shared.outputs.cross_account_role_arn
+  ]
+  
+  enable_cicd_permissions = true
+  
+  tags = var.tags
+}
+
+# Define locals for shared account resources
+locals {
+  shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+  
+  # Convert shared ECR repository ARNs to a list
+  shared_ecr_repository_arns = [
+    for repo in var.shared_ecr_repositories : 
+    "arn:aws:ecr:${data.aws_region.current.name}:${local.shared_account_id}:repository/${var.project_name}-shared-${repo}"
+  ]
 }

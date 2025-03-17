@@ -18,6 +18,12 @@ locals {
   
   # Use provided repositories if specified, otherwise use defaults
   repositories = length(var.ecr_repositories) > 0 ? var.ecr_repositories : local.default_repositories
+  
+  # Normalize tags
+  normalized_tags = merge(var.tags, {
+    Environment = var.env
+    Terraform   = "true"
+  })
 }
 
 resource "aws_ecr_repository" "lambda_repos" {
@@ -36,11 +42,9 @@ resource "aws_ecr_repository" "lambda_repos" {
     kms_key        = var.kms_key_arn
   }
 
-  tags = merge(var.tags, {
-    Environment = var.env
-    Name        = each.value
-    Type        = can(regex("^l-", each.value)) ? "lambda" : "eks"  # Added type tag
-    Terraform   = "true"
+  tags = merge(local.normalized_tags, {
+    Name = each.value
+    Type = startswith(each.value, "l-") ? "lambda" : "eks"
   })
 }
 
@@ -68,6 +72,27 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
   })
 }
 
+# Authorization token policy for cross-account access
+resource "aws_iam_policy" "ecr_auth_token" {
+  count = length(var.cross_account_arns) > 0 ? 1 : 0
+  
+  name        = "${var.project_name}-${var.env}-ecr-auth-token"
+  description = "Policy allowing ECR GetAuthorizationToken for cross-account access"
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      }
+    ]
+  })
+  
+  tags = local.normalized_tags
+}
+
 # IAM policy document for repository
 data "aws_iam_policy_document" "lambda_repos" {
   for_each = toset(local.repositories)
@@ -80,11 +105,7 @@ data "aws_iam_policy_document" "lambda_repos" {
 
     principals {
       type = "Service"
-      identifiers = each.value != null ? (
-        startswith(each.value, "l-") ? 
-        ["lambda.amazonaws.com"] : 
-        ["eks.amazonaws.com"]
-      ) : []
+      identifiers = startswith(each.value, "l-") ? ["lambda.amazonaws.com"] : ["eks.amazonaws.com"]
     }
 
     principals {
@@ -121,15 +142,18 @@ resource "aws_ecr_repository_policy" "lambda_repos" {
 output "repository_urls" {
   description = "URLs of the created ECR repositories"
   value = {
-    for k, v in aws_ecr_repository.lambda_repos :
-    k => v.repository_url
+    for k in local.repositories : k => aws_ecr_repository.lambda_repos[k].repository_url
   }
 }
 
 output "repository_arns" {
   description = "ARNs of the created ECR repositories"
   value = {
-    for k, v in aws_ecr_repository.lambda_repos :
-    k => v.arn
+    for k in local.repositories : k => aws_ecr_repository.lambda_repos[k].arn
   }
+}
+
+output "auth_token_policy_arn" {
+  description = "ARN of the ECR GetAuthorizationToken policy"
+  value       = length(var.cross_account_arns) > 0 ? aws_iam_policy.ecr_auth_token[0].arn : null
 }
