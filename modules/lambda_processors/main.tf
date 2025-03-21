@@ -46,7 +46,6 @@ resource "aws_lambda_function" "processor" {
       DB_CLUSTER_ARN  = var.aurora_cluster_arn
       DB_NAME         = var.aurora_database_name
       MODEL_TYPE      = each.value
-      AWS_REGION      = var.aws_region
     }, var.additional_environment_variables)
   }
 

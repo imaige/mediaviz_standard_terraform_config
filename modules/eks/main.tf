@@ -2,6 +2,8 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.31"
 
+  create_cloudwatch_log_group = false
+
   cluster_name    = "${var.project_name}-${var.env}-cluster"
   cluster_version = var.cluster_version
 
@@ -17,20 +19,24 @@ module "eks" {
   # Authentication configuration
   authentication_mode = "API"
 
-  access_entries = {
-    # Admin access
-    admin = {
-      kubernetes_groups = ["cluster-admin"]
-      principal_arn     = var.eks_admin_role_arn
-      type              = "STANDARD"
-    }
-    # Optional: CI/CD access for deployments
-    cicd = {
-      kubernetes_groups = ["system:masters"]
-      principal_arn     = var.github_actions_role_arn
-      type              = "STANDARD"
-    }
-  }
+  access_entries = merge(
+    {
+      # Admin access
+      admin = {
+        kubernetes_groups = ["cluster-admin"]
+        principal_arn     = var.eks_admin_role_arn
+        type              = "STANDARD"
+      }
+    },
+    var.github_actions_role_arn != "" ? {
+      # CI/CD access for deployments
+      cicd = {
+        kubernetes_groups = ["system:masters"]
+        principal_arn     = var.github_actions_role_arn
+        type              = "STANDARD"
+      }
+    } : {}
+  )
 
   # Enable encryption for Kubernetes secrets
   cluster_encryption_config = {
@@ -264,25 +270,25 @@ resource "aws_cloudwatch_log_group" "eks_logs" {
 
 # Install NVIDIA Device Plugin for GPU support
 resource "helm_release" "nvidia_device_plugin" {
-  count = var.install_nvidia_plugin ? 1 : 0
+  count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
   
   name             = "nvdp"
   repository       = "https://nvidia.github.io/k8s-device-plugin"
   chart            = "nvidia-device-plugin"
   version          = var.nvidia_plugin_version
-  namespace        = "kube-system"  # Using kube-system instead of a separate namespace
+  namespace        = "kube-system"
 
   values = [
     yamlencode({
       gfd = {
-        enabled = true
+        enabled = "true"  # Changed from boolean to string
       },
       migStrategy = "none",
-      failOnInitError = true,
+      failOnInitError = "true",  # Changed from boolean to string
       deviceListStrategy = "envvar",
       deviceIDStrategy = "uuid",
       nfd = {
-        enabled = true
+        enabled = "true"  # Changed from boolean to string
       }
     })
   ]
@@ -297,9 +303,9 @@ resource "aws_iam_policy" "node_secrets_policy" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat(
       # Secrets Manager access
-      {
+      [{
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue",
@@ -308,9 +314,10 @@ resource "aws_iam_policy" "node_secrets_policy" {
         Resource = [
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.project_name}-${var.env}*"
         ]
-      },
-      # Aurora Data API access
-      {
+      }],
+      
+      # Aurora Data API access - only include if aurora_cluster_arns is not empty
+      length(var.aurora_cluster_arns) > 0 ? [{
         Effect = "Allow"
         Action = [
           "rds-data:ExecuteStatement",
@@ -319,10 +326,11 @@ resource "aws_iam_policy" "node_secrets_policy" {
           "rds-data:CommitTransaction",
           "rds-data:RollbackTransaction"
         ]
-        Resource = length(var.aurora_cluster_arns) > 0 ? var.aurora_cluster_arns : ["*"]
-      },
-      # KMS access for decryption
-      {
+        Resource = var.aurora_cluster_arns
+      }] : [],
+      
+      # KMS access - only include if kms_key_arns is not empty
+      length(var.kms_key_arns) > 0 ? [{
         Effect = "Allow"
         Action = [
           "kms:Decrypt",
@@ -330,9 +338,10 @@ resource "aws_iam_policy" "node_secrets_policy" {
           "kms:GenerateDataKey*"
         ]
         Resource = var.kms_key_arns
-      },
-      # SQS access for processing
-      {
+      }] : [],
+      
+      # SQS access - only include if sqs_queue_arns is not empty
+      length(var.sqs_queue_arns) > 0 ? [{
         Effect = "Allow"
         Action = [
           "sqs:ReceiveMessage",
@@ -342,9 +351,10 @@ resource "aws_iam_policy" "node_secrets_policy" {
           "sqs:ChangeMessageVisibility"
         ]
         Resource = var.sqs_queue_arns
-      },
-      # S3 access for storage
-      {
+      }] : [],
+      
+      # S3 access - only include if s3_bucket_arns is not empty
+      length(var.s3_bucket_arns) > 0 ? [{
         Effect = "Allow"
         Action = [
           "s3:GetObject",
@@ -355,8 +365,8 @@ resource "aws_iam_policy" "node_secrets_policy" {
           var.s3_bucket_arns,
           [for arn in var.s3_bucket_arns : "${arn}/*"]
         )
-      }
-    ]
+      }] : []
+    )
   })
   
   tags = var.tags
@@ -364,7 +374,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
 
 # Create service account for cross-account access if needed
 resource "kubernetes_service_account" "shared_resources_sa" {
-  count = var.enable_shared_access ? 1 : 0
+  count = var.enable_shared_access && var.create_kubernetes_resources ? 1 : 0
   
   metadata {
     name      = "${var.project_name}-shared-access"
@@ -376,6 +386,25 @@ resource "kubernetes_service_account" "shared_resources_sa" {
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
-  depends_on = [module.eks]
+}
+
+resource "aws_iam_policy" "node_basic_policy" {
+  name        = "${var.project_name}-${var.env}-node-basic-policy"
+  description = "Basic policy for EKS nodes when no specific resources are defined"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = ["*"]
+      }
+    ]
+  })
 }

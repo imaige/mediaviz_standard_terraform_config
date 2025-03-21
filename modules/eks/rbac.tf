@@ -26,6 +26,7 @@ provider "helm" {
   }
 }
 
+
 # Add a wait condition to ensure the cluster is available before applying RBAC
 resource "time_sleep" "wait_for_cluster" {
   depends_on = [module.eks]
@@ -34,6 +35,7 @@ resource "time_sleep" "wait_for_cluster" {
 
 # Create a ClusterRoleBinding for admin users
 resource "kubernetes_cluster_role_binding" "admin_users" {
+  count = var.create_kubernetes_resources ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {

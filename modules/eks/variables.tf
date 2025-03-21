@@ -185,3 +185,9 @@ variable "create_developer_role" {
   type        = bool
   default     = false
 }
+
+variable "create_kubernetes_resources" {
+  description = "Whether to create Kubernetes resources like service accounts and Helm charts"
+  type        = bool
+  default     = false
+}

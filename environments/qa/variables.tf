@@ -19,7 +19,7 @@ variable "cluster_name" {
 variable "aws_account_id" {
   description = "AWS Account ID"
   type        = string
-  default     = "054037110591" # Your current AWS account ID
+  default     = "515966522375" # Your current AWS account ID
 }
 
 variable "eks_primary_instance_type" {

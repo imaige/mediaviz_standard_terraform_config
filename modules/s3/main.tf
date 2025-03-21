@@ -73,15 +73,28 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
   bucket = aws_s3_bucket.primary.id
 
   rule {
-    id     = "cleanup"
+    id     = "expiration-rule"
     status = "Enabled"
-
-    abort_incomplete_multipart_upload {
-      days_after_initiation = 7
+    
+    # Add a filter block to comply with AWS provider requirements
+    filter {
+      prefix = "" # Empty prefix applies to all objects
     }
 
+    # Set expiration to max(retention_days, 91) to ensure it's greater than the longest transition period
     expiration {
-      days = var.retention_days
+      days = max(var.retention_days, 91)
+    }
+    
+    # Storage class transitions
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+    
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
     }
   }
 }
@@ -136,7 +149,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   rule {
     id     = "cleanup"
     status = "Enabled"
-
+    filter {
+      prefix = ""  # Empty prefix applies to all objects
+    }
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -209,10 +224,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed" {
     id     = "cleanup"
     status = "Enabled"
 
+    filter {
+      prefix = ""  # Empty prefix applies to all objects
+    }
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
 
+    # Ensure expiration is greater than any transition periods that might be added in the future
     expiration {
       days = 365
     }
@@ -272,6 +292,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
   bucket = aws_s3_bucket.helm_charts.id
 
   rule {
+    filter {
+      prefix = ""  # Empty prefix applies to all objects
+    }
     id     = "cleanup"
     status = "Enabled"
 
@@ -309,7 +332,7 @@ resource "aws_s3_bucket_policy" "helm_charts" {
       {
         Effect = "Allow",
         Principal = {
-          AWS = "arn:aws:iam::054037110591:root"  # Use a known valid ARN
+          AWS = "arn:aws:iam::515966522375:root"  # Use a known valid ARN
         },
         Action = [
           "s3:GetObject",
