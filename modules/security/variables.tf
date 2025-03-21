@@ -28,3 +28,9 @@ variable "enable_sso" {
   type        = bool
   default     = false
 }
+
+variable "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions role"
+  type        = string
+  default     = ""  # Empty default to make it optional
+}

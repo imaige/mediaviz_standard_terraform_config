@@ -1,4 +1,4 @@
-# MediaViz Standard Terraform Configuration
+# MediaViz Infrastructure Documentation
 
 Infrastructure as Code (IaC) setup for MediaViz platform using Terraform and AWS.
 
@@ -29,7 +29,7 @@ aws configure list-profiles
 
 3. Use SSO profile:
 ```bash
-export AWS_PROFILE=mediaviz
+export AWS_PROFILE=mediaviz-{ENVIRONMENT}
 # Verify authentication
 aws sts get-caller-identity
 ```
@@ -38,21 +38,21 @@ aws sts get-caller-identity
 
 1. Add cluster to your kubeconfig with SSO profile:
 ```bash
-aws eks update-kubeconfig --region us-east-2 --name mediaviz-dev-cluster \
-    --profile mediaviz
+aws eks update-kubeconfig --region us-east-2 --name mediaviz-{ENVIRONMENT}-cluster \
+    --profile mediaviz-{ENVIRONMENT}
 ```
 
 2. Update kubeconfig for SSO authentication:
 ```bash
-kubectl config set-credential mediaviz-dev-cluster \
+kubectl config set-credential mediaviz-{ENVIRONMENT}-cluster \
     --exec-api-version=client.authentication.k8s.io/v1beta1 \
     --exec-command=aws \
     --exec-arg=eks \
     --exec-arg=get-token \
     --exec-arg=--cluster-name \
-    --exec-arg=mediaviz-dev-cluster \
+    --exec-arg=mediaviz-{ENVIRONMENT}-cluster \
     --exec-arg=--profile \
-    --exec-arg=mediaviz
+    --exec-arg=mediaviz-{ENVIRONMENT}
 ```
 
 ## Project Structure
@@ -60,9 +60,9 @@ kubectl config set-credential mediaviz-dev-cluster \
 ```
 ├── environments/
 │   ├── dev/
-│   │   ├── backend-config.hcl
-│   │   └── terraform.tfvars
-│   └── prod/
+│   ├── qa/
+│   ├── prod/
+│   └── shared/
 ├── modules/
 │   ├── api_gateway/
 │   ├── lambda/
@@ -76,17 +76,18 @@ kubectl config set-credential mediaviz-dev-cluster \
 
 1. Initialize Terraform with backend configuration:
 ```bash
-terraform init -backend-config=dev/backend-config.hcl
+cd environments/{ENVIRONMENT}
+terraform init -backend-config=backend-config.hcl
 ```
 
 2. Validate your Terraform configuration:
 ```bash
-terraform validate -var-file dev/terraform.tfvars
+terraform validate -var-file terraform.tfvars
 ```
 
 3. Create execution plan:
 ```bash
-terraform plan -var-file dev/terraform.tfvars -out plan.out
+terraform plan -var-file terraform.tfvars -out plan.out
 ```
 
 4. Apply the changes:
@@ -110,7 +111,7 @@ We use multiple tools to ensure infrastructure security:
 1. Always use `plan.out` file when applying changes
 2. Review security scan results before applying changes
 3. Use branch protection and require PR reviews
-4. Maintain separate environments (dev/prod)
+4. Maintain separate environments (dev/qa/prod)
 5. Follow least privilege principle for IAM roles
 
 ## CI/CD Pipeline
@@ -133,17 +134,17 @@ The Aurora PostgreSQL database is deployed in private subnets and is not publicl
 ```bash
 # Retrieve SSH key from Secrets Manager
 aws secretsmanager get-secret-value \
-    --secret-id mediaviz-dev-bastion-key \
+    --secret-id mediaviz-{ENVIRONMENT}-bastion-key \
     --query 'SecretString' \
-    --output text > mediaviz-dev-bastion.pem
+    --output text > mediaviz-{ENVIRONMENT}-bastion.pem
 
 # Set correct permissions
-chmod 400 mediaviz-dev-bastion.pem
+chmod 400 mediaviz-{ENVIRONMENT}-bastion.pem
 ```
 
-2. Create SSH tunnel through bastion host:
+2. Create SSH tunnel through bastion host (get the correct values for your environment):
 ```bash
-ssh -i mediaviz-dev-bastion.pem -L 5433:mediaviz-serverless-dev-aurora.cluster-cotsmbbj0vgr.us-east-2.rds.amazonaws.com:5432 ubuntu@3.129.70.11
+ssh -i mediaviz-{ENVIRONMENT}-bastion.pem -L 5433:{AURORA_ENDPOINT}:5432 ec2-user@{BASTION_IP}
 ```
 
 3. Connect to the database through the tunnel:
@@ -155,7 +156,7 @@ psql -h localhost -p 5433 -U postgres -d imaige
 ```bash
 # Get Aurora credentials
 aws secretsmanager get-secret-value \
-    --secret-id mediaviz-serverless-dev-aurora-credentials-pg \
+    --secret-id mediaviz-{ENVIRONMENT}-aurora-credentials-pg \
     --query 'SecretString' \
     --output text | jq '.'
 ```
@@ -214,10 +215,31 @@ PGPASSWORD='source_password' pg_dump \
    - Ensure SSH tunnel is active
    - Check if the database is running
 
+## Environment-Specific Information
+
+### Getting Environment-Specific Values
+
+To get the correct values for your environment, run:
+
+```bash
+# For bastion host IP
+aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=mediaviz-{ENVIRONMENT}-bastion" \
+    --query "Reservations[0].Instances[0].PublicIpAddress" \
+    --profile mediaviz-{ENVIRONMENT} \
+    --output text
+
+# For Aurora endpoint
+aws rds describe-db-clusters \
+    --db-cluster-identifier mediaviz-{ENVIRONMENT}-aurora \
+    --query "DBClusters[0].Endpoint" \
+    --profile mediaviz-{ENVIRONMENT} \
+    --output text
+```
 
 ## Common Issues
 
-1. **SSO Session Expired**: Run `aws sso login --profile mediaviz` to refresh
+1. **SSO Session Expired**: Run `aws sso login --profile mediaviz-{ENVIRONMENT}` to refresh
 2. **State Lock**: If state is locked, check for running operations or manually unlock if needed
 3. **EKS Access**: Ensure your SSO role has appropriate EKS permissions
 4. **Backend Issues**: Verify S3 bucket and DynamoDB table permissions
@@ -239,7 +261,3 @@ PGPASSWORD='source_password' pg_dump \
 - S3 buckets for storage
 - EventBridge for event routing
 - SQS queues for async processing
-
-## License
-
-[Add your license information here]

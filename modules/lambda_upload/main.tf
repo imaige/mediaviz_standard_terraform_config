@@ -52,7 +52,7 @@ resource "aws_lambda_function" "image_upload" {
     mode = "Active"
   }
 
-  reserved_concurrent_executions = 500
+  reserved_concurrent_executions = null
 
   tags = merge(local.normalized_tags, {
     environment = var.env

@@ -1,17 +1,3 @@
-# Data sources
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-
-# Access shared account state (Assumes remote state is already configured)
-data "terraform_remote_state" "shared" {
-  backend = "s3"
-  config = {
-    bucket = "mediaviz-terraform-state"
-    key    = "shared/terraform.tfstate"
-    region = "us-east-1"  # Use variable instead
-  }
-}
-
 # Existing Infrastructure
 module "vpc" {
   source = "./../../modules/networking"
@@ -29,6 +15,7 @@ module "security" {
   kms_key_id   = null  # Will be created by the module
   cluster_name = var.cluster_name  # Reference before creation, will be updated
   enable_sso   = false
+  github_actions_role_arn = module.github_oidc.role_arn
   
   tags = var.tags
 }
@@ -73,7 +60,9 @@ module "eks" {
   enable_shared_access = true
   shared_access_role_arn = module.cross_account_roles.role_arn
   
+  
   install_nvidia_plugin = true
+  create_kubernetes_resources = true
   
   tags = var.tags
 }
@@ -233,10 +222,6 @@ module "sqs" {
   tags = var.tags
 }
 
-module "eks_functions" {
-  source = "./../../modules/eks_functions"
-}
-
 module "aurora" {
   source = "./../../modules/aurora"
 
@@ -282,6 +267,9 @@ module "eks_processors" {
   project_name = var.project_name
   env          = var.env
   aws_region   = data.aws_region.current.name
+  
+  # Add this variable
+  shared_account_id = data.terraform_remote_state.shared.outputs.account_id
 
   aurora_cluster_arn   = module.aurora.cluster_arn
   aurora_secret_arn    = module.aurora.secret_arn
@@ -300,12 +288,11 @@ module "eks_processors" {
   oidc_provider     = module.eks.oidc_provider
   oidc_provider_arn = module.eks.oidc_provider_arn
   
-  # Add cross-account access for ECR
+  # Keep these existing parameters
   cross_account_arns = [
     data.terraform_remote_state.shared.outputs.cross_account_role_arn
   ]
   
-  # Reference shared S3 bucket
   s3_bucket_arns = [
     data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
     "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
