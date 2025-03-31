@@ -182,13 +182,13 @@ variable "shared_ecr_repositories" {
 variable "gpu_instance_types" {
   description = "Instance types for the GPU node group"
   type        = list(string)
-  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
+  default     = ["g5.xlarge"]
 }
 
 variable "gpu_node_min_size" {
   description = "Minimum size of the GPU node group"
   type        = number
-  default     = 0
+  default     = 3
 }
 
 variable "gpu_node_max_size" {
@@ -200,7 +200,7 @@ variable "gpu_node_max_size" {
 variable "gpu_node_desired_size" {
   description = "Desired size of the GPU node group"
   type        = number
-  default     = 0
+  default     = 3
 }
 
 variable "bastion_allowed_ips" {
@@ -217,3 +217,4 @@ variable "bastion_allowed_ips" {
     "135.129.132.20/32"
   ]
 }
+

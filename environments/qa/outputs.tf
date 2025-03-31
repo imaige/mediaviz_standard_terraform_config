@@ -83,3 +83,26 @@ output "shared_account_resources" {
     kms_key_arn        = data.terraform_remote_state.shared.outputs.kms_key_arn
   }
 }
+
+# Add this to your outputs.tf file in your workload account
+
+output "shared_account_outputs" {
+  description = "Available outputs from the shared account (for debugging)"
+  value = {
+    keys = keys(data.terraform_remote_state.shared.outputs)
+  }
+}
+
+output "shared_account_output_sample" {
+  description = "Sample of a specific output from shared account"
+  value = try(data.terraform_remote_state.shared.outputs.ecr_repository_urls, "Not available")
+}
+
+# This will help identify what the actual S3 bucket output structure is
+output "shared_account_s3_outputs" {
+  description = "All outputs containing 's3' or 'bucket'"
+  value = {
+    for k, v in data.terraform_remote_state.shared.outputs :
+    k => v if can(regex("(s3|bucket)", lower(k)))
+  }
+}

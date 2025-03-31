@@ -124,7 +124,8 @@ resource "aws_iam_policy" "eks_admin_policy" {
         Effect = "Allow"
         Action = [
           "eks:DescribeCluster",
-          "eks:ListClusters"
+          "eks:ListClusters",
+          "eks:AccessKubernetesApi"
         ]
         Resource = module.eks.cluster_arn
       },

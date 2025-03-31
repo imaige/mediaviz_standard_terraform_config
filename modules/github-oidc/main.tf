@@ -4,7 +4,7 @@
 resource "aws_iam_openid_connect_provider" "github_actions" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]  # GitHub OIDC thumbprint
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"] # GitHub OIDC thumbprint
 }
 
 # IAM role for GitHub Actions with trust relationship
@@ -26,7 +26,8 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+            # Using a wildcard to allow all repositories in the organization
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/*:*"
           }
         }
       }
@@ -113,7 +114,7 @@ resource "aws_iam_role_policy" "account_specific" {
             "ecr:ListImages"
           ]
           Resource = [
-            "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-${var.env}-*"
+            "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-shared-*"
           ]
         },
         {
@@ -123,10 +124,10 @@ resource "aws_iam_role_policy" "account_specific" {
             "kms:GenerateDataKey*",
             "kms:DescribeKey"
           ]
-          Resource = length(var.kms_key_arns) > 0 ? var.kms_key_arns : ["*"]
+          Resource = ["*"]
         }
       ] : [],
-      
+
       # Workload account permissions for EKS and Lambda
       var.account_type == "workload" ? [
         {
@@ -135,12 +136,13 @@ resource "aws_iam_role_policy" "account_specific" {
             "eks:DescribeCluster",
             "eks:ListClusters",
             "lambda:UpdateFunctionCode",
-            "lambda:GetFunction"
+            "lambda:GetFunction",
+            "eks:AccessKubernetesApi"
           ]
           Resource = "*"
         }
       ] : [],
-      
+
       # Workload account permissions for ECR
       var.account_type == "workload" && length(var.shared_ecr_arns) > 0 ? [
         {
@@ -153,7 +155,7 @@ resource "aws_iam_role_policy" "account_specific" {
           Resource = var.shared_ecr_arns
         }
       ] : [],
-      
+
       # Workload account permissions for S3
       var.account_type == "workload" && length(var.shared_s3_arns) > 0 ? [
         {
@@ -165,7 +167,7 @@ resource "aws_iam_role_policy" "account_specific" {
           Resource = var.shared_s3_arns
         }
       ] : [],
-      
+
       # Workload account permissions for KMS
       var.account_type == "workload" && length(var.kms_key_arns) > 0 ? [
         {
@@ -174,7 +176,7 @@ resource "aws_iam_role_policy" "account_specific" {
             "kms:Decrypt",
             "kms:DescribeKey"
           ]
-          Resource = var.kms_key_arns
+          Resource = ["*"]
         }
       ] : []
     )
@@ -201,7 +203,7 @@ resource "aws_iam_role_policy" "cicd_workflow" {
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage"
         ]
-        Resource = var.account_type == "shared" ? ["arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-${var.env}-*"] : var.shared_ecr_arns
+        Resource = var.account_type == "shared" ? ["arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.project_name}-shared-*"] : var.shared_ecr_arns
       },
       {
         Effect = "Allow"
@@ -216,13 +218,17 @@ resource "aws_iam_role_policy" "cicd_workflow" {
         Effect = "Allow"
         Action = [
           "eks:DescribeCluster",
-          "eks:ListClusters"
+          "eks:ListClusters",
+          "eks:AccessKubernetesApi"
         ]
-        Resource = var.account_type == "workload" ? ["arn:aws:eks:${var.aws_region}:${var.aws_account_id}:cluster/${var.project_name}-${var.env}"] : []
+        Resource = var.account_type == "workload" ? ["arn:aws:eks:${var.aws_region}:${var.aws_account_id}:cluster/${var.cluster_name}"] : []
       }
     ]
   })
 }
+
+# Get current account ID
+data "aws_caller_identity" "current" {}
 
 # Outputs to use in GitHub Actions workflows
 output "role_arn" {

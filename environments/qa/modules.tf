@@ -63,6 +63,19 @@ module "eks" {
   
   install_nvidia_plugin = true
   create_kubernetes_resources = true
+
+  additional_access_entries = {
+    caleb_sso = {
+      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_e2f331b752f1e129"
+      type              = "STANDARD"
+    },
+    dmitrii_sso = {
+      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSAdministratorAccess_472a40aff28af737"
+      type              = "STANDARD"
+    }
+  }
   
   tags = var.tags
 }
@@ -261,6 +274,8 @@ module "bastion" {
 #   ...
 # }
 
+# This is just the updated part of your modules.tf file
+
 module "eks_processors" {
   source = "./../../modules/eks_processors"
 
@@ -268,39 +283,50 @@ module "eks_processors" {
   env          = var.env
   aws_region   = data.aws_region.current.name
   
-  # Add this variable
+  # Shared services configuration
   shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+  shared_role_arn   = data.terraform_remote_state.shared.outputs.cross_account_role_arn
+  
+  # Disable shared role assumption temporarily until we resolve the errors
+  enable_shared_role_assumption = false
 
+  # Aurora configurations
   aurora_cluster_arn   = module.aurora.cluster_arn
   aurora_secret_arn    = module.aurora.secret_arn
   aurora_database_name = module.aurora.database_name
 
+  # Kubernetes namespace
   namespace     = "default"
-  chart_version = "0.1.0"
-  replicas      = 1
-
+  
+  # SQS configuration
   sqs_queues = {
     "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
     "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
   }
 
+  # Security and identity
   kms_key_arn       = module.security.kms_key_arn
   oidc_provider     = module.eks.oidc_provider
   oidc_provider_arn = module.eks.oidc_provider_arn
   
-  # Keep these existing parameters
-  cross_account_arns = [
-    data.terraform_remote_state.shared.outputs.cross_account_role_arn
-  ]
-  
+  # S3 bucket access
   s3_bucket_arns = [
-    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
-    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
   ]
+
+  # Set enable_helm_deployments to false for now while we set up the infrastructure
+  enable_helm_deployments = true
+  
+  # Resource settings
+  replicas = 1
+  cpu_request = "100m"
+  memory_request = "128Mi"
+  cpu_limit = "500m"
+  memory_limit = "512Mi"
 
   tags = var.tags
 }
-
 module "cross_account_roles" {
   source = "../../modules/cross-account-roles"
   
@@ -322,8 +348,8 @@ module "cross_account_roles" {
   
   # Access shared S3 buckets
   s3_bucket_arns = [
-    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
-    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
   ]
   
   # Add KMS keys
@@ -356,8 +382,8 @@ module "github_oidc" {
   
   # Access to shared S3 buckets
   shared_s3_arns = [
-    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn,
-    "${data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn}/*"
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
   ]
   
   # Cross-account role to assume
@@ -371,12 +397,12 @@ module "github_oidc" {
 }
 
 # Define locals for shared account resources
-locals {
-  shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+# locals {
+#   #shared_account_id = data.terraform_remote_state.shared.outputs.account_id
   
-  # Convert shared ECR repository ARNs to a list
-  shared_ecr_repository_arns = [
-    for repo in var.shared_ecr_repositories : 
-    "arn:aws:ecr:${data.aws_region.current.name}:${local.shared_account_id}:repository/${var.project_name}-shared-${repo}"
-  ]
-}
+#   # Convert shared ECR repository ARNs to a list
+#   shared_ecr_repository_arns = [
+#     for repo in var.shared_ecr_repositories : 
+#     "arn:aws:ecr:${data.aws_region.current.name}:${local.shared_account_id}:repository/${var.project_name}-shared-${repo}"
+#   ]
+# }

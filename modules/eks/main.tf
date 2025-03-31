@@ -19,24 +19,26 @@ module "eks" {
   # Authentication configuration
   authentication_mode = "API"
 
-  access_entries = merge(
-    {
-      # Admin access
-      admin = {
-        kubernetes_groups = ["cluster-admin"]
-        principal_arn     = var.eks_admin_role_arn
-        type              = "STANDARD"
-      }
-    },
-    var.github_actions_role_arn != "" ? {
-      # CI/CD access for deployments
-      cicd = {
-        kubernetes_groups = ["system:masters"]
-        principal_arn     = var.github_actions_role_arn
-        type              = "STANDARD"
-      }
-    } : {}
-  )
+access_entries = merge(
+  {
+    # Admin access
+    admin = {
+      kubernetes_groups = ["cluster-admin"]
+      principal_arn     = var.eks_admin_role_arn
+      type              = "STANDARD"
+    }
+  },
+  var.github_actions_role_arn != "" ? {
+    # CI/CD access for deployments
+    cicd = {
+      kubernetes_groups = ["system:masters"]
+      principal_arn     = var.github_actions_role_arn
+      type              = "STANDARD"
+    }
+  } : {},
+  var.additional_access_entries  # Add this line to include the additional entries
+)
+
 
   # Enable encryption for Kubernetes secrets
   cluster_encryption_config = {

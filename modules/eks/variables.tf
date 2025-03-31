@@ -191,3 +191,13 @@ variable "create_kubernetes_resources" {
   type        = bool
   default     = false
 }
+
+variable "additional_access_entries" {
+  description = "Additional IAM principals to grant access to the EKS cluster"
+  type = map(object({
+    kubernetes_groups = list(string)
+    principal_arn     = string
+    type              = string
+  }))
+  default = {}
+}
