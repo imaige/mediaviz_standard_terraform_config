@@ -12,6 +12,7 @@ locals {
     "eks-mediaviz-external-api",
     "eks-evidence-model",
     "eks-similarity-model",
+    "eks-similarity-set-sorting-service",
     "eks-image-classification-model",
     "eks-external-api"
   ]

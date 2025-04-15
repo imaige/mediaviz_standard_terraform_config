@@ -1,22 +1,32 @@
 locals {
   models = {
     "feature-extraction-model" = {
-      short_name = "feature-extraction"
+      short_name = "feature-extraction-model"
       needs_sqs  = true
       needs_helm = true
     }
     "image-classification-model" = {
-      short_name = "image-classification"
+      short_name = "image-classification-model"
       needs_sqs  = true
       needs_helm = true
     }
     "external-api" = {
-      short_name = "external-api"
+      short_name = "external-api-model"
       needs_sqs  = false
       needs_helm = true
     }
     "evidence-model" = {
-      short_name = "evidence"
+      short_name = "evidence-model"
+      needs_sqs  = false
+      needs_helm = true
+    }
+    "similarity-model" = {
+      short_name = "similarity-model"
+      needs_sqs  = false
+      needs_helm = true
+    }
+      "similarity-set-sorting-service" = {
+      short_name = "similarity-set-sorting-service"
       needs_sqs  = false
       needs_helm = true
     }
@@ -64,7 +74,8 @@ resource "aws_iam_role" "model_role" {
         Condition = {
           StringEquals = {
             # Service account name to be created by Helm in CI/CD
-            "${replace(var.oidc_provider, "https://", "")}:sub" = "system:serviceaccount:${var.namespace}:eks-${each.value.short_name}"
+            "${replace(var.oidc_provider, "https://", "")}:aud" = "sts.amazonaws.com",
+            "${replace(var.oidc_provider, "https://", "")}:sub" = "system:serviceaccount:${var.namespace}:eks-processor-${each.value.short_name}"
           }
         }
       }
@@ -194,134 +205,134 @@ resource "aws_iam_role_policy" "assume_shared_role" {
 }
 
 # Create Kubernetes service accounts for models
-resource "kubernetes_service_account" "model_service_accounts" {
-  for_each = local.helm_models
+# resource "kubernetes_service_account" "model_service_accounts" {
+#   for_each = local.helm_models
 
-  metadata {
-    name      = "eks-${each.value.short_name}"
-    namespace = var.namespace
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.model_role[each.key].arn
-    }
-    labels = {
-      "app.kubernetes.io/name"       = "eks-${each.value.short_name}"
-      "app.kubernetes.io/managed-by" = "terraform"
-      "app.kubernetes.io/part-of"    = var.project_name
-      "environment"                  = var.env
-    }
-  }
+#   metadata {
+#     name      = "eks-${each.value.short_name}"
+#     namespace = var.namespace
+#     annotations = {
+#       "eks.amazonaws.com/role-arn" = aws_iam_role.model_role[each.key].arn
+#     }
+#     labels = {
+#       "app.kubernetes.io/name"       = "eks-${each.value.short_name}"
+#       "app.kubernetes.io/managed-by" = "terraform"
+#       "app.kubernetes.io/part-of"    = var.project_name
+#       "environment"                  = var.env
+#     }
+#   }
 
-  automount_service_account_token = true
-}
+#   automount_service_account_token = true
+# }
 
 # Using Helm to deploy models (simplified to avoid templatefile)
-resource "helm_release" "model_deployments" {
-  for_each = var.enable_helm_deployments ? local.helm_models : {}
+# resource "helm_release" "model_deployments" {
+#   for_each = var.enable_helm_deployments ? local.helm_models : {}
 
-  name      = "eks-${each.value.short_name}"
-  namespace = var.namespace
-  # Use the public or internal Helm chart repository
-  repository = var.helm_repository
-  chart      = var.helm_chart_name
-  version    = var.helm_chart_version
+#   name      = "eks-${each.value.short_name}"
+#   namespace = var.namespace
+#   # Use the public or internal Helm chart repository
+#   repository = var.helm_repository
+#   chart      = var.helm_chart_name
+#   version    = var.helm_chart_version
 
-  create_namespace = true
-  wait             = true
-  atomic           = true
-  timeout          = var.helm_timeout
+#   create_namespace = true
+#   wait             = true
+#   atomic           = true
+#   timeout          = var.helm_timeout
 
-  # Use inline values instead of templatefile
-  set {
-    name  = "image.repository"
-    value = local.repository_urls[each.key]
-  }
+#   # Use inline values instead of templatefile
+#   set {
+#     name  = "image.repository"
+#     value = local.repository_urls[each.key]
+#   }
 
-  set {
-    name  = "image.tag"
-    value = var.image_tag
-  }
+#   set {
+#     name  = "image.tag"
+#     value = var.image_tag
+#   }
 
-  set {
-    name  = "replicaCount"
-    value = var.replicas
-  }
+#   set {
+#     name  = "replicaCount"
+#     value = var.replicas
+#   }
 
-  set {
-    name  = "serviceAccount.name"
-    value = "eks-${each.value.short_name}"
-  }
+#   set {
+#     name  = "serviceAccount.name"
+#     value = "eks-${each.value.short_name}"
+#   }
 
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.model_role[each.key].arn
-  }
+#   set {
+#     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+#     value = aws_iam_role.model_role[each.key].arn
+#   }
 
-  set {
-    name  = "env.AWS_REGION"
-    value = var.aws_region
-  }
+#   set {
+#     name  = "env.AWS_REGION"
+#     value = var.aws_region
+#   }
 
-  set {
-    name  = "env.ENVIRONMENT"
-    value = var.env
-  }
+#   set {
+#     name  = "env.ENVIRONMENT"
+#     value = var.env
+#   }
 
-  set {
-    name  = "env.MODEL_NAME"
-    value = each.key
-  }
+#   set {
+#     name  = "env.MODEL_NAME"
+#     value = each.key
+#   }
 
-  set {
-    name  = "env.DB_CLUSTER_ARN"
-    value = var.aurora_cluster_arn
-  }
+#   set {
+#     name  = "env.DB_CLUSTER_ARN"
+#     value = var.aurora_cluster_arn
+#   }
 
-  set {
-    name  = "env.DB_SECRET_ARN"
-    value = var.aurora_secret_arn
-  }
+#   set {
+#     name  = "env.DB_SECRET_ARN"
+#     value = var.aurora_secret_arn
+#   }
 
-  set {
-    name  = "env.DB_NAME"
-    value = var.aurora_database_name
-  }
+#   set {
+#     name  = "env.DB_NAME"
+#     value = var.aurora_database_name
+#   }
 
-  # Conditionally set SQS URL if needed
-  dynamic "set" {
-    for_each = each.value.needs_sqs ? [1] : []
-    content {
-      name  = "env.SQS_QUEUE_URL"
-      value = lookup(var.sqs_queues, each.key, "")
-    }
-  }
+#   # Conditionally set SQS URL if needed
+#   dynamic "set" {
+#     for_each = each.value.needs_sqs ? [1] : []
+#     content {
+#       name  = "env.SQS_QUEUE_URL"
+#       value = lookup(var.sqs_queues, each.key, "")
+#     }
+#   }
 
-  # Resource limits
-  set {
-    name  = "resources.limits.cpu"
-    value = var.cpu_limit
-  }
+#   # Resource limits
+#   set {
+#     name  = "resources.limits.cpu"
+#     value = var.cpu_limit
+#   }
 
-  set {
-    name  = "resources.limits.memory"
-    value = var.memory_limit
-  }
+#   set {
+#     name  = "resources.limits.memory"
+#     value = var.memory_limit
+#   }
 
-  set {
-    name  = "resources.requests.cpu"
-    value = var.cpu_request
-  }
+#   set {
+#     name  = "resources.requests.cpu"
+#     value = var.cpu_request
+#   }
 
-  set {
-    name  = "resources.requests.memory"
-    value = var.memory_request
-  }
+#   set {
+#     name  = "resources.requests.memory"
+#     value = var.memory_request
+#   }
 
-  depends_on = [
-    aws_iam_role.model_role,
-    aws_iam_role_policy.model_policies,
-    kubernetes_service_account.model_service_accounts
-  ]
-}
+#   depends_on = [
+#     aws_iam_role.model_role,
+#     aws_iam_role_policy.model_policies,
+#     kubernetes_service_account.model_service_accounts
+#   ]
+# }
 
 # Get current account ID
 data "aws_caller_identity" "current" {}
@@ -339,16 +350,16 @@ output "all_role_arns" {
   value       = values(aws_iam_role.model_role)[*].arn
 }
 
-output "helm_releases" {
-  description = "Names of the deployed Helm releases"
-  value = {
-    for k, v in helm_release.model_deployments : k => v.name
-  }
-}
+# output "helm_releases" {
+#   description = "Names of the deployed Helm releases"
+#   value = {
+#     for k, v in helm_release.model_deployments : k => v.name
+#   }
+# }
 
-output "service_account_names" {
-  description = "Names of the Kubernetes service accounts created"
-  value = {
-    for k, v in kubernetes_service_account.model_service_accounts : k => v.metadata[0].name
-  }
-}
+# output "service_account_names" {
+#   description = "Names of the Kubernetes service accounts created"
+#   value = {
+#     for k, v in kubernetes_service_account.model_service_accounts : k => v.metadata[0].name
+#   }
+# }

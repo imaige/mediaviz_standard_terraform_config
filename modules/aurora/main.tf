@@ -128,6 +128,8 @@ resource "aws_rds_cluster" "aurora" {
   storage_encrypted     = true
   kms_key_id           = aws_kms_key.aurora.arn
 
+  performance_insights_enabled = true
+
   serverlessv2_scaling_configuration {
     min_capacity = var.min_capacity
     max_capacity = var.max_capacity

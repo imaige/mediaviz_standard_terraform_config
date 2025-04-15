@@ -22,6 +22,7 @@ locals {
     "eks-mediaviz-external-api"      = local.shared_ecr_repository_urls["eks-mediaviz-external-api"]
     "eks-evidence-model"             = local.shared_ecr_repository_urls["eks-evidence-model"]
     "eks-similarity-model"           = local.shared_ecr_repository_urls["eks-similarity-model"]
+    "eks-similarity-set-sorting-service"           = local.shared_ecr_repository_urls["eks-similarity-set-sorting-service"]
     "eks-external-api"               = local.shared_ecr_repository_urls["eks-external-api"]
   }
 }

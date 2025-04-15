@@ -39,7 +39,11 @@ variable "ecr_repositories" {
     "l-image-comparison-model",
     "l-facial-recognition-model",
     "eks-feature-extraction-model",
-    "eks-image-classification-model"
+    "eks-image-classification-model",
+    "eks-mediaviz-external-api",
+    "eks-evidence-model",
+    "eks-similarity-model",
+    "eks-similarity-set-sorting-service",
   ]
 }
 

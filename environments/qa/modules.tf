@@ -249,8 +249,8 @@ module "aurora" {
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 
-  min_capacity = 0.5
-  max_capacity = 16
+  min_capacity = 5
+  max_capacity = 256
 
   tags = var.tags
 }
