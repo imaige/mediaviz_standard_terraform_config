@@ -246,15 +246,11 @@ resource "aws_iam_role_policy" "s3_policy" {
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:GetObjectVersion"
+        Action = "s3:*"
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
         ]
-        Resource = concat(
-          var.s3_bucket_arns,
-          [for bucket in var.s3_bucket_arns : "${bucket}/*"]
-        )
       }
     ]
   })

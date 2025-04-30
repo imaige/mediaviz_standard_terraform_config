@@ -159,7 +159,7 @@ module "lambda_processors" {
   # Lambda scaling and concurrency
   batch_size       = 1
   batch_window     = 0
-  max_concurrency  = 10
+  max_concurrency  = 1000
   
   tags = var.tags
 }
@@ -249,6 +249,7 @@ module "aurora" {
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 
+  instance_count = 2  # Add a reader instance
   min_capacity = 5
   max_capacity = 256
 

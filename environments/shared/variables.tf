@@ -44,6 +44,7 @@ variable "ecr_repositories" {
     "eks-evidence-model",
     "eks-similarity-model",
     "eks-similarity-set-sorting-service",
+    "eks-personhood-model",
   ]
 }
 

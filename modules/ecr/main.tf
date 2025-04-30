@@ -14,7 +14,8 @@ locals {
     "eks-similarity-model",
     "eks-similarity-set-sorting-service",
     "eks-image-classification-model",
-    "eks-external-api"
+    "eks-external-api",
+    "eks-personhood-model",
   ]
   
   # Use provided repositories if specified, otherwise use defaults

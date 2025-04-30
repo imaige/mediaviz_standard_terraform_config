@@ -30,6 +30,11 @@ locals {
       needs_sqs  = false
       needs_helm = true
     }
+    "personhood-model" = {
+      short_name = "personhood-model"
+      needs_sqs  = false
+      needs_helm = true
+    }
   }
 
   # Filtered map for models that need SQS
