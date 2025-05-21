@@ -72,19 +72,19 @@ variable "tags" {
 variable "node_group_min_size" {
   description = "Minimum size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 16
 }
 
 variable "node_group_max_size" {
   description = "Maximum size of the EKS node group"
   type        = number
-  default     = 10
+  default     = 20
 }
 
 variable "node_group_desired_size" {
   description = "Desired size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 16
 }
 
 variable "cors_allowed_origins" {

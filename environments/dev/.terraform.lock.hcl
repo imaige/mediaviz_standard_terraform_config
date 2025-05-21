@@ -5,6 +5,7 @@ provider "registry.terraform.io/hashicorp/archive" {
   version = "2.7.0"
   hashes = [
     "h1:1niS9AcwxN8CrWemnJS2Xf6vM72+48Xh3xFSS3DFWQo=",
+    "h1:YkXq4JfcoAW0L4B9ghskZUxYbYAXIPlfSqqVFrAS06U=",
     "zh:04e23bebca7f665a19a032343aeecd230028a3822e546e6f618f24c47ff87f67",
     "zh:5bb38114238e25c45bf85f5c9f627a2d0c4b98fe44a0837e37d48574385f8dad",
     "zh:64584bc1db4c390abd81c76de438d93acf967c8a33e9b923d68da6ed749d55bd",
@@ -22,8 +23,9 @@ provider "registry.terraform.io/hashicorp/archive" {
 
 provider "registry.terraform.io/hashicorp/aws" {
   version     = "5.82.2"
-  constraints = ">= 4.33.0, >= 4.35.0, ~> 5.0, >= 5.81.0"
+  constraints = ">= 4.0.0, >= 4.33.0, >= 4.35.0, ~> 5.0, >= 5.81.0"
   hashes = [
+    "h1:RuPaHbllUB8a2TGTyc149wJfoh6zhIEjUvFYKR6iP2E=",
     "h1:ce6Dw2y4PpuqAPtnQ0dO270dRTmwEARqnfffrE1VYJ8=",
     "zh:0262fc96012fb7e173e1b7beadd46dfc25b1dc7eaef95b90e936fc454724f1c8",
     "zh:397413613d27f4f54d16efcbf4f0a43c059bd8d827fe34287522ae182a992f9b",
@@ -47,6 +49,7 @@ provider "registry.terraform.io/hashicorp/cloudinit" {
   version     = "2.3.5"
   constraints = ">= 2.0.0"
   hashes = [
+    "h1:HCoabXm6NQwCivl1q24+l9VUufc2mFqNeulsQBA9iFg=",
     "h1:Sf1Lt21oTADbzsnlU38ylpkl8YXP0Beznjcy5F/Yx64=",
     "zh:17c20574de8eb925b0091c9b6a4d859e9d6e399cd890b44cfbc028f4f312ac7a",
     "zh:348664d9a900f7baf7b091cf94d657e4c968b240d31d9e162086724e6afc19d5",
@@ -64,8 +67,10 @@ provider "registry.terraform.io/hashicorp/cloudinit" {
 }
 
 provider "registry.terraform.io/hashicorp/helm" {
-  version = "2.17.0"
+  version     = "2.17.0"
+  constraints = ">= 2.5.0, ~> 2.17.0"
   hashes = [
+    "h1:K5FEjxvDnxb1JF1kG1xr8J3pNGxoaR3Z0IBG9Csm/Is=",
     "h1:kQMkcPVvHOguOqnxoEU2sm1ND9vCHiT8TvZ2x6v/Rsw=",
     "zh:06fb4e9932f0afc1904d2279e6e99353c2ddac0d765305ce90519af410706bd4",
     "zh:104eccfc781fc868da3c7fec4385ad14ed183eb985c96331a1a937ac79c2d1a7",
@@ -83,8 +88,10 @@ provider "registry.terraform.io/hashicorp/helm" {
 }
 
 provider "registry.terraform.io/hashicorp/kubernetes" {
-  version = "2.35.1"
+  version     = "2.35.1"
+  constraints = ">= 2.10.0, ~> 2.20"
   hashes = [
+    "h1:Av0Wk8g2XjY2oap7nyWNHEgfCRfphdJvrkqJjEM2ZKM=",
     "h1:zgXeWvp4//Ry+4glwNrLMpPFOU8QBQlARNmR9WCNe9o=",
     "zh:12212ca5ae47823ce14bfafb909eeb6861faf1e2435fb2fc4a8b334b3544b5f5",
     "zh:3f49b3d77182df06b225ab266667de69681c2e75d296867eb2cf06a8f8db768c",
@@ -105,6 +112,7 @@ provider "registry.terraform.io/hashicorp/null" {
   version     = "3.2.3"
   constraints = ">= 3.0.0"
   hashes = [
+    "h1:+AnORRgFbRO6qqcfaQyeX80W0eX3VmjadjnUFUJTiXo=",
     "h1:I0Um8UkrMUb81Fxq/dxbr3HLP2cecTH2WMJiwKSrwQY=",
     "zh:22d062e5278d872fe7aed834f5577ba0a5afe34a3bdac2b81f828d8d3e6706d2",
     "zh:23dead00493ad863729495dc212fd6c29b8293e707b055ce5ba21ee453ce552d",
@@ -124,6 +132,7 @@ provider "registry.terraform.io/hashicorp/null" {
 provider "registry.terraform.io/hashicorp/random" {
   version = "3.6.3"
   hashes = [
+    "h1:Fnaec9vA8sZ8BXVlN3Xn9Jz3zghSETIKg7ch8oXhxno=",
     "h1:zG9uFP8l9u+yGZZvi5Te7PV62j50azpgwPunq2vTm1E=",
     "zh:04ceb65210251339f07cd4611885d242cd4d0c7306e86dda9785396807c00451",
     "zh:448f56199f3e99ff75d5c0afacae867ee795e4dfda6cb5f8e3b2a72ec3583dd8",
@@ -142,8 +151,9 @@ provider "registry.terraform.io/hashicorp/random" {
 
 provider "registry.terraform.io/hashicorp/time" {
   version     = "0.12.1"
-  constraints = ">= 0.9.0"
+  constraints = ">= 0.9.0, ~> 0.9"
   hashes = [
+    "h1:6BhxSYBJdBBKyuqatOGkuPKVenfx6UmLdiI13Pb3his=",
     "h1:JzYsPugN8Fb7C4NlfLoFu7BBPuRVT2/fCOdCaxshveI=",
     "zh:090023137df8effe8804e81c65f636dadf8f9d35b79c3afff282d39367ba44b2",
     "zh:26f1e458358ba55f6558613f1427dcfa6ae2be5119b722d0b3adb27cd001efea",
@@ -164,6 +174,7 @@ provider "registry.terraform.io/hashicorp/tls" {
   version     = "4.0.6"
   constraints = ">= 3.0.0"
   hashes = [
+    "h1:dYSb3V94K5dDMtrBRLPzBpkMTPn+3cXZ/kIJdtFL+2M=",
     "h1:n3M50qfWfRSpQV9Pwcvuse03pEizqrmYEryxKky4so4=",
     "zh:10de0d8af02f2e578101688fd334da3849f56ea91b0d9bd5b1f7a243417fdda8",
     "zh:37fc01f8b2bc9d5b055dc3e78bfd1beb7c42cfb776a4c81106e19c8911366297",

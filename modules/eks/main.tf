@@ -135,9 +135,9 @@ access_entries = merge(
 
     # GPU node group for ML workloads
     gpu = {
-      ami_type       = "AL2_x86_64_GPU"
+      ami_type       = "AL2023_x86_64_NVIDIA"
       instance_types = var.gpu_instance_types
-      capacity_type  = "ON_DEMAND"
+      capacity_type  = "SPOT"
 
       min_size     = var.gpu_node_min_size
       max_size     = var.gpu_node_max_size

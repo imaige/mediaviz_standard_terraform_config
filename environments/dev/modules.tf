@@ -17,10 +17,20 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
 
+  # Primary node group configuration
   eks_primary_instance_type = var.eks_primary_instance_type
   node_group_min_size       = var.node_group_min_size
   node_group_max_size       = var.node_group_max_size
   node_group_desired_size   = var.node_group_desired_size
+
+  # GPU node group configuration
+  gpu_instance_types    = var.gpu_instance_types
+  gpu_node_min_size     = var.gpu_node_min_size
+  gpu_node_max_size     = var.gpu_node_max_size
+  gpu_node_desired_size = var.gpu_node_desired_size
+
+  # Install NVIDIA plugin for GPU support
+  install_nvidia_plugin = true
 
   aws_account_id     = var.aws_account_id
   kms_key_arn        = module.security.kms_key_arn
@@ -181,10 +191,10 @@ module "security" {
 
 }
 
-module "eks_functions" {
-  source = "./../../modules/eks_functions"
+# module "eks_functions" {
+#   source = "./../../modules/eks_functions"
 
-}
+# }
 
 module "aurora" {
   source = "./../../modules/aurora"
@@ -196,7 +206,7 @@ module "aurora" {
 
   database_name              = "imaige"
   lambda_security_group_id   = module.lambda_processors.all_security_group_ids[0]
-  engine_version             = "16.3"
+  engine_version             = "16.6"
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 
@@ -253,6 +263,7 @@ module "eks_processors" {
 
   namespace     = "default"
   chart_version = "0.1.0"
+  # Use 1 replica for each pod type as per requirements
   replicas      = 1
 
   sqs_queues = {

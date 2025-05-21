@@ -140,7 +140,8 @@ resource "aws_iam_role_policy" "model_policies" {
         {
           Effect = "Allow"
           Action = [
-            "s3:*"
+            "s3:*",
+            "s3:PutBucketCORS"
           ]
           Resource = "*"
         },
@@ -177,6 +178,41 @@ resource "aws_iam_role_policy" "model_policies" {
         }
       ]
     )
+  })
+}
+
+# Custom policy for personhood model to allow Rekognition permissions
+resource "aws_iam_role_policy" "personhood_rekognition_policy" {
+  count = contains(keys(local.models), "personhood-model") ? 1 : 0
+  
+  name = "${var.project_name}-${var.env}-eks-personhood-rekognition-policy"
+  role = aws_iam_role.model_role["personhood-model"].id
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rekognition:CompareFaces",
+          "rekognition:DetectFaces",
+          "rekognition:DetectLabels",
+          "rekognition:DetectModerationLabels",
+          "rekognition:DetectText",
+          "rekognition:GetCelebrityInfo",
+          "rekognition:RecognizeCelebrities",
+          "rekognition:ListCollections",
+          "rekognition:ListFaces",
+          "rekognition:SearchFaces",
+          "rekognition:SearchFacesByImage",
+          "rekognition:CreateCollection",
+          "rekognition:DeleteCollection",
+          "rekognition:IndexFaces",
+          "rekognition:DeleteFaces"
+        ]
+        Resource = ["*"]
+      }
+    ]
   })
 }
 

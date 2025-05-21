@@ -112,6 +112,73 @@ resource "kubernetes_role_binding" "developer" {
   }
 }
 
+# Create a ClusterRole and ClusterRoleBinding for MediavizDevelopers group
+resource "kubernetes_cluster_role" "mediaviz_developer" {
+  count = var.create_developer_role ? 1 : 0
+  depends_on = [time_sleep.wait_for_cluster]
+
+  metadata {
+    name = "eks-developer-role"
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods", "services", "configmaps", "persistentvolumeclaims"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments", "statefulsets", "replicasets"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["batch"]
+    resources  = ["jobs", "cronjobs"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["extensions"]
+    resources  = ["deployments", "ingresses"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods/log"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding" "mediaviz_developer" {
+  count = var.create_developer_role ? 1 : 0
+  depends_on = [time_sleep.wait_for_cluster]
+
+  metadata {
+    name = "mediaviz-developer-binding"
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.mediaviz_developer[0].metadata[0].name
+  }
+
+  subject {
+    kind      = "Group"
+    name      = "MediavizDevelopers"
+    api_group = "rbac.authorization.k8s.io"
+  }
+}
+
 # Create an IAM policy document allowing IAM Principal to authenticate to Kubernetes cluster
 resource "aws_iam_policy" "eks_admin_policy" {
   name        = "${var.project_name}-${var.env}-eks-admin-policy"

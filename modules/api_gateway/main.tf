@@ -4,13 +4,13 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_credentials = false  # Changed to false since we're using allow_origins = ["*"]
+    allow_credentials = false # Changed to false since we're using allow_origins = ["*"]
     allow_headers = [
       "content-type",
       "x-bucket-name",
       "x-file-name",
       "x-models",
-      "x-company-id", 
+      "x-company-id",
       "x-user-id",
       "x-project-table-name",
       "x-client-side-id",
@@ -23,6 +23,7 @@ resource "aws_apigatewayv2_api" "main" {
       "x-date-taken",
       "x-latitude",
       "x-longitude",
+      "x-photo-index",
       "authorization",
       "x-amz-date",
       "x-api-key",
@@ -40,7 +41,8 @@ resource "aws_apigatewayv2_api" "main" {
       "x-models",
       "x-project-table-name",
       "x-title",
-      "x-user-id"
+      "x-user-id",
+      "x-photo-index"
     ]
     max_age = 300
   }
@@ -79,15 +81,15 @@ resource "aws_apigatewayv2_stage" "main" {
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_logs.arn
     format = jsonencode({
-      requestId         = "$context.requestId"
-      ip               = "$context.identity.sourceIp"
-      requestTime      = "$context.requestTime"
-      httpMethod       = "$context.httpMethod"
-      routeKey         = "$context.routeKey"
-      status           = "$context.status"
-      protocol         = "$context.protocol"
-      responseLength   = "$context.responseLength"
-      integrationError = "$context.integrationErrorMessage"
+      requestId          = "$context.requestId"
+      ip                 = "$context.identity.sourceIp"
+      requestTime        = "$context.requestTime"
+      httpMethod         = "$context.httpMethod"
+      routeKey           = "$context.routeKey"
+      status             = "$context.status"
+      protocol           = "$context.protocol"
+      responseLength     = "$context.responseLength"
+      integrationError   = "$context.integrationErrorMessage"
       integrationLatency = "$context.integrationLatency"
     })
   }

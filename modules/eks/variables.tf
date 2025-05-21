@@ -141,7 +141,7 @@ variable "install_nvidia_plugin" {
 variable "nvidia_plugin_version" {
   description = "Version of the NVIDIA device plugin Helm chart"
   type        = string
-  default     = "0.17.0"
+  default     = "0.17.1"
 }
 
 variable "aurora_cluster_arns" {

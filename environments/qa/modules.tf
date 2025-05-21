@@ -60,6 +60,8 @@ module "eks" {
   enable_shared_access = true
   shared_access_role_arn = module.cross_account_roles.role_arn
   
+  # Enable developer role for MediavizDevelopers group
+  create_developer_role = true
   
   install_nvidia_plugin = true
   create_kubernetes_resources = true
@@ -73,6 +75,11 @@ module "eks" {
     dmitrii_sso = {
       kubernetes_groups = ["cluster-admin"] # Changed from system:masters
       principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSAdministratorAccess_472a40aff28af737"
+      type              = "STANDARD"
+    },
+    mediaviz_developers = {
+      kubernetes_groups = ["MediavizDevelopers"]
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_1b02cabbd428e5e0"
       type              = "STANDARD"
     }
   }
@@ -245,7 +252,7 @@ module "aurora" {
 
   database_name              = "imaige"
   lambda_security_group_id   = module.lambda_processors.all_security_group_ids[0]
-  engine_version             = "16.3"
+  engine_version             = "16.6"
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 

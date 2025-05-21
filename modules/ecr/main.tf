@@ -60,7 +60,46 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 5 images"
+        description  = "Keep only the newest image tagged as 'dev'"
+        selection = {
+          tagStatus     = "tagged"
+          tagPatternList = ["dev"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 1
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep only the newest image tagged as 'qa'"
+        selection = {
+          tagStatus     = "tagged"
+          tagPatternList = ["qa"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 1
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 3
+        description  = "Keep only the newest image tagged as 'prod'"
+        selection = {
+          tagStatus     = "tagged"
+          tagPatternList = ["prod"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 1
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 4
+        description  = "Keep newest 5 untagged or other tagged images"
         selection = {
           tagStatus     = "any"
           countType     = "imageCountMoreThan"

@@ -28,6 +28,30 @@ variable "eks_primary_instance_type" {
   default     = ["t3.medium"]
 }
 
+variable "gpu_instance_types" {
+  description = "Instance types for the GPU node group"
+  type        = list(string)
+  default     = ["g4dn.xlarge"]  # NVIDIA T4 GPU instances
+}
+
+variable "gpu_node_min_size" {
+  description = "Minimum size of the GPU node group"
+  type        = number
+  default     = 0
+}
+
+variable "gpu_node_max_size" {
+  description = "Maximum size of the GPU node group"
+  type        = number
+  default     = 4
+}
+
+variable "gpu_node_desired_size" {
+  description = "Desired size of the GPU node group"
+  type        = number
+  default     = 4  # For the 4 required GPU pods
+}
+
 variable "eks_managed_node_groups" {
   description = "Map of EKS managed node group configurations"
   type        = map(any)
@@ -72,19 +96,19 @@ variable "tags" {
 variable "node_group_min_size" {
   description = "Minimum size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 2  # Reduced to accommodate non-GPU workloads
 }
 
 variable "node_group_max_size" {
   description = "Maximum size of the EKS node group"
   type        = number
-  default     = 10
+  default     = 5  # Reduced max size
 }
 
 variable "node_group_desired_size" {
   description = "Desired size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 2  # Reduced to accommodate non-GPU workloads
 }
 
 variable "cors_allowed_origins" {

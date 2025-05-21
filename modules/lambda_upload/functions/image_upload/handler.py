@@ -50,6 +50,7 @@ class ImageUploadHandler:
                     'date_taken': headers.get('x-date-taken'),
                     'latitude': headers.get('x-latitude'),
                     'longitude': headers.get('x-longitude'),
+                    'photo_index': headers.get('x-photo-index'),
                 }
             else:
                 return None
@@ -113,6 +114,7 @@ class ImageUploadHandler:
             date_taken: Union[str, None],
             latitude: Union[float, None],
             longitude: Union[float, None],
+            photo_index: Union[int, None],
     ) -> int:
         # date_taken_converted = convert_to_postgres_date(date_taken) if date_taken is not None else None
         response = self.rds_client.execute_statement(
@@ -137,7 +139,8 @@ class ImageUploadHandler:
                         date_taken, 
                         date_uploaded, 
                         latitude, 
-                        longitude
+                        longitude,
+                        photo_index
                     )
                 VALUES (
                     :user_id, 
@@ -155,7 +158,8 @@ class ImageUploadHandler:
                     CAST(:date_taken AS TIMESTAMP), 
                     CAST(:date_uploaded AS TIMESTAMP), 
                     :latitude, 
-                    :longitude
+                    :longitude,
+                    :photo_index
                 )
                 RETURNING
                     id
@@ -177,6 +181,7 @@ class ImageUploadHandler:
                 {'name': 'date_uploaded', 'value': {'stringValue': datetime.now().isoformat()}},
                 {'name': 'latitude', 'value': {'doubleValue': latitude} if latitude else {'isNull': True}},
                 {'name': 'longitude', 'value': {'doubleValue': longitude} if longitude else {'isNull': True}},
+                {'name': 'photo_index', 'value': {'longValue': photo_index} if photo_index else {'isNull': True}},
             ]
         )
         if response['records']:
@@ -298,6 +303,7 @@ class ImageUploadHandler:
             date_taken = headers.get("date_taken", None)
             latitude = headers.get("latitude", None)
             longitude = headers.get("longitude", None)
+            photo_index = headers.get("photo_index", None)
 
             # TODO: validate company_id and user_id against DB
 
@@ -322,7 +328,8 @@ class ImageUploadHandler:
                 int(source_resolution_y) if source_resolution_y else None,
                 date_taken,
                 float(latitude) if latitude else None,
-                float(longitude) if longitude else None
+                float(longitude) if longitude else None,
+                int(photo_index) if photo_index else None
             )
 
             # Upload to S3
