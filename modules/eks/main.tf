@@ -19,25 +19,25 @@ module "eks" {
   # Authentication configuration
   authentication_mode = "API"
 
-access_entries = merge(
-  {
-    # Admin access
-    admin = {
-      kubernetes_groups = ["cluster-admin"]
-      principal_arn     = var.eks_admin_role_arn
-      type              = "STANDARD"
-    }
-  },
-  var.github_actions_role_arn != "" ? {
-    # CI/CD access for deployments
-    cicd = {
-      kubernetes_groups = ["system:masters"]
-      principal_arn     = var.github_actions_role_arn
-      type              = "STANDARD"
-    }
-  } : {},
-  var.additional_access_entries  # Add this line to include the additional entries
-)
+  access_entries = merge(
+    {
+      # Admin access
+      admin = {
+        kubernetes_groups = ["cluster-admin"]
+        principal_arn     = var.eks_admin_role_arn
+        type              = "STANDARD"
+      }
+    },
+    var.github_actions_role_arn != "" ? {
+      # CI/CD access for deployments
+      cicd = {
+        kubernetes_groups = ["system:masters"]
+        principal_arn     = var.github_actions_role_arn
+        type              = "STANDARD"
+      }
+    } : {},
+    var.additional_access_entries # Add this line to include the additional entries
+  )
 
 
   # Enable encryption for Kubernetes secrets
@@ -71,20 +71,20 @@ access_entries = merge(
       })
     }
     aws-ebs-csi-driver = {
-      most_recent = true
+      most_recent              = true
       service_account_role_arn = aws_iam_role.ebs_csi_role.arn
     }
   }
 
   enable_cluster_creator_admin_permissions = true
-  
+
   # Define node groups with appropriate configurations
   eks_managed_node_groups = {
     # Primary node group for general workloads
     primary = {
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = var.eks_primary_instance_type
-      capacity_type  = "ON_DEMAND"
+      capacity_type  = "SPOT"
 
       min_size     = var.node_group_min_size
       max_size     = var.node_group_max_size
@@ -117,19 +117,19 @@ access_entries = merge(
           }
         }
       }
-      
+
       # Kubernetes labels for node selection
       labels = {
         "node-type"                        = "primary"
         "node.kubernetes.io/workload-type" = "general"
       }
-      
+
       # Comprehensive tagging
       tags = merge(var.tags, {
-        Name         = "${var.project_name}-${var.env}-primary-node"
-        NodeGroup    = "primary"
-        Environment  = var.env
-        ManagedBy    = "terraform"
+        Name        = "${var.project_name}-${var.env}-primary-node"
+        NodeGroup   = "primary"
+        Environment = var.env
+        ManagedBy   = "terraform"
       })
     }
 
@@ -146,6 +146,11 @@ access_entries = merge(
       enable_monitoring = true
       ebs_optimized     = true
 
+      # Configure update behavior
+      update_config = {
+        max_unavailable_percentage = 25
+      }
+
       # Add IAM policies
       iam_role_additional_policies = {
         secrets_policy = aws_iam_policy.node_secrets_policy.arn,
@@ -154,10 +159,10 @@ access_entries = merge(
 
       # Kubernetes labels for node selection
       labels = {
-        "node.kubernetes.io/instance-type" = "g4dn.xlarge"
         "nvidia.com/gpu.present"           = "true"
         "nvidia.com/gpu.product"           = "Tesla-T4"
         "node-type"                        = "gpu"
+        "app-type"                         = "ml-application"
       }
 
       # Taints to ensure only GPU workloads run on these nodes
@@ -184,12 +189,78 @@ access_entries = merge(
           }
         }
       }
-      
+
       # Comprehensive tagging
       tags = merge(var.tags, {
-        Name         = "${var.project_name}-${var.env}-gpu-node"
-        NodeGroup    = "gpu"
-        GpuType      = "nvidia-t4"
+        Name        = "${var.project_name}-${var.env}-gpu-node"
+        NodeGroup   = "gpu"
+        GpuType     = "nvidia-t4"
+        Environment = var.env
+        ManagedBy   = "terraform"
+      })
+    }
+
+    # High-performance GPU node group dedicated for evidence model
+    "high_power_gpu-${var.nodegroup_version}" = {
+      ami_type       = "AL2023_x86_64_NVIDIA"
+      instance_types = var.evidence_gpu_instance_types
+      capacity_type  = "ON_DEMAND"
+
+      min_size     = var.evidence_gpu_node_min_size
+      max_size     = var.evidence_gpu_node_max_size
+      desired_size = var.evidence_gpu_node_desired_size
+
+      enable_monitoring = true
+      ebs_optimized     = true
+
+      # Configure update behavior
+      update_config = {
+        max_unavailable_percentage = 25
+      }
+
+      # Add IAM policies
+      iam_role_additional_policies = {
+        secrets_policy = aws_iam_policy.node_secrets_policy.arn,
+        ssm_policy     = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }
+
+      # Kubernetes labels for node selection
+      labels = {
+        "nvidia.com/gpu.present"           = "true"
+        "nvidia.com/gpu.product"           = "A10G"
+        "node-type"                        = "high-power-gpu"
+      }
+
+      taints = {
+        dedicated = {
+          key    = "nvidia.com/gpu"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
+
+      # High-performance block device mappings for evidence processing
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 1000
+            volume_type           = "gp3"
+            iops                  = 16000
+            throughput            = 1000
+            encrypted             = true
+            kms_key_id            = var.kms_key_arn
+            delete_on_termination = true
+          }
+        }
+      }
+
+      # Comprehensive tagging
+      tags = merge(var.tags, {
+        Name         = "${var.project_name}-${var.env}-high-power-gpu-node"
+        NodeGroup    = "high-power-gpu"
+        WorkloadType = "evidence-model"
+        GpuType      = "nvidia-a10g"
         Environment  = var.env
         ManagedBy    = "terraform"
       })
@@ -220,7 +291,7 @@ access_entries = merge(
       }
     }
   } : {}
-  
+
   # Module tags
   tags = merge(var.tags, {
     Environment = var.env
@@ -232,7 +303,7 @@ access_entries = merge(
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {
   name = "${var.project_name}-${var.env}-ebs-csi-role"
-  
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -243,12 +314,12 @@ resource "aws_iam_role" "ebs_csi_role" {
       Action = "sts:AssumeRoleWithWebIdentity",
       Condition = {
         StringEquals = {
-          "${module.eks.oidc_provider}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+          "${module.eks.oidc_provider}:sub" : "system:serviceaccount:kube-system:ebs-csi-controller-sa"
         }
       }
     }]
   })
-  
+
   tags = var.tags
 }
 
@@ -263,7 +334,7 @@ resource "aws_cloudwatch_log_group" "eks_logs" {
   name              = "/aws/eks/${var.project_name}-${var.env}-cluster/cluster"
   retention_in_days = var.log_retention_days
   kms_key_id        = var.cloudwatch_logs_kms_key_arn
-  
+
   tags = merge(var.tags, {
     Environment = var.env
     ManagedBy   = "terraform"
@@ -273,28 +344,28 @@ resource "aws_cloudwatch_log_group" "eks_logs" {
 # Install NVIDIA Device Plugin for GPU support
 resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
-  
-  name             = "nvdp"
-  repository       = "https://nvidia.github.io/k8s-device-plugin"
-  chart            = "nvidia-device-plugin"
-  version          = var.nvidia_plugin_version
-  namespace        = "kube-system"
+
+  name       = "nvdp"
+  repository = "https://nvidia.github.io/k8s-device-plugin"
+  chart      = "nvidia-device-plugin"
+  version    = var.nvidia_plugin_version
+  namespace  = "kube-system"
 
   values = [
     yamlencode({
       gfd = {
-        enabled = "true"  # Changed from boolean to string
+        enabled = "true" # Changed from boolean to string
       },
-      migStrategy = "none",
-      failOnInitError = "true",  # Changed from boolean to string
+      migStrategy        = "none",
+      failOnInitError    = "true", # Changed from boolean to string
       deviceListStrategy = "envvar",
-      deviceIDStrategy = "uuid",
+      deviceIDStrategy   = "uuid",
       nfd = {
-        enabled = "true"  # Changed from boolean to string
+        enabled = "true" # Changed from boolean to string
       }
     })
   ]
-  
+
   depends_on = [module.eks]
 }
 
@@ -317,7 +388,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.project_name}-${var.env}*"
         ]
       }],
-      
+
       # Aurora Data API access - only include if aurora_cluster_arns is not empty
       length(var.aurora_cluster_arns) > 0 ? [{
         Effect = "Allow"
@@ -330,7 +401,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
         ]
         Resource = var.aurora_cluster_arns
       }] : [],
-      
+
       # KMS access - only include if kms_key_arns is not empty
       length(var.kms_key_arns) > 0 ? [{
         Effect = "Allow"
@@ -341,7 +412,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
         ]
         Resource = var.kms_key_arns
       }] : [],
-      
+
       # SQS access - only include if sqs_queue_arns is not empty
       length(var.sqs_queue_arns) > 0 ? [{
         Effect = "Allow"
@@ -354,14 +425,14 @@ resource "aws_iam_policy" "node_secrets_policy" {
         ]
         Resource = var.sqs_queue_arns
       }] : [],
-      
+
       # S3 access - only include if s3_bucket_arns is not empty
       length(var.s3_bucket_arns) > 0 ? [{
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:ListBucket",
-          "s3:PutObject" 
+          "s3:PutObject"
         ]
         Resource = concat(
           var.s3_bucket_arns,
@@ -370,14 +441,14 @@ resource "aws_iam_policy" "node_secrets_policy" {
       }] : []
     )
   })
-  
+
   tags = var.tags
 }
 
 # Create service account for cross-account access if needed
 resource "kubernetes_service_account" "shared_resources_sa" {
   count = var.enable_shared_access && var.create_kubernetes_resources ? 1 : 0
-  
+
   metadata {
     name      = "${var.project_name}-shared-access"
     namespace = "default"
@@ -398,8 +469,8 @@ resource "aws_iam_policy" "node_basic_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",

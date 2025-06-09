@@ -16,9 +16,9 @@ locals {
 #----------------------------------------------------------
 resource "aws_iam_role" "shared_resource_access" {
   count = var.account_type == "shared" ? 1 : 0
-  
+
   name = "${var.project_name}-shared-resource-access"
-  
+
   # Allow workload accounts to assume this role
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -31,23 +31,23 @@ resource "aws_iam_role" "shared_resource_access" {
         Action = "sts:AssumeRole"
         Condition = {
           StringEquals = {
-            "aws:PrincipalTag/Environment": var.allowed_environments
+            "aws:PrincipalTag/Environment" : var.allowed_environments
           }
         }
       }
     ]
   })
-  
+
   tags = local.normalized_tags
 }
 
 # ECR access policy
 resource "aws_iam_role_policy" "ecr_access" {
   count = var.account_type == "shared" ? 1 : 0
-  
+
   name = "${var.project_name}-ecr-access-policy"
   role = aws_iam_role.shared_resource_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -74,10 +74,10 @@ resource "aws_iam_role_policy" "ecr_access" {
 # S3 access policy
 resource "aws_iam_role_policy" "s3_access" {
   count = var.account_type == "shared" ? 1 : 0
-  
+
   name = "${var.project_name}-s3-access-policy"
   role = aws_iam_role.shared_resource_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -96,10 +96,10 @@ resource "aws_iam_role_policy" "s3_access" {
 # KMS access policy - for decrypting S3 objects and ECR images
 resource "aws_iam_role_policy" "kms_access" {
   count = var.account_type == "shared" ? 1 : 0
-  
+
   name = "${var.project_name}-kms-access-policy"
   role = aws_iam_role.shared_resource_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -119,10 +119,10 @@ resource "aws_iam_role_policy" "kms_access" {
 # Replace this in your modules/cross-account-roles/main.tf
 resource "aws_iam_role_policy" "cicd_access" {
   count = var.account_type == "shared" && length(var.cicd_principal_arns) > 0 ? 1 : 0
-  
+
   name = "${var.project_name}-cicd-access-policy"
   role = aws_iam_role.shared_resource_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -152,9 +152,9 @@ resource "aws_iam_role_policy" "cicd_access" {
 # Role for accessing shared account resources
 resource "aws_iam_role" "shared_account_access" {
   count = var.account_type == "workload" ? 1 : 0
-  
+
   name = "${var.project_name}-${var.env}-shared-account-access"
-  
+
   # Allow specified roles (GitHub Actions, etc.) to assume this role
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -181,23 +181,23 @@ resource "aws_iam_role" "shared_account_access" {
       ] : []
     )
   })
-  
+
   tags = local.normalized_tags
 }
 
 # Policy allowing workload account role to assume role in shared account
 resource "aws_iam_role_policy" "assume_shared_role" {
   count = var.account_type == "workload" && var.shared_role_arn != "" ? 1 : 0
-  
+
   name = "${var.project_name}-${var.env}-assume-shared-role"
   role = aws_iam_role.shared_account_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
         Resource = var.shared_role_arn
       }
     ]
@@ -207,10 +207,10 @@ resource "aws_iam_role_policy" "assume_shared_role" {
 # Direct ECR access permissions for workload account's role (optional)
 resource "aws_iam_role_policy" "workload_ecr_access" {
   count = var.account_type == "workload" && length(var.ecr_repository_arns) > 0 ? 1 : 0
-  
+
   name = "${var.project_name}-${var.env}-ecr-direct-access"
   role = aws_iam_role.shared_account_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -237,10 +237,10 @@ resource "aws_iam_role_policy" "workload_ecr_access" {
 # Direct S3 access permissions for workload account's role (optional)
 resource "aws_iam_role_policy" "workload_s3_access" {
   count = var.account_type == "workload" && length(var.s3_bucket_arns) > 0 ? 1 : 0
-  
+
   name = "${var.project_name}-${var.env}-s3-direct-access"
   role = aws_iam_role.shared_account_access[0].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

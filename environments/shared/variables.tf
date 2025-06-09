@@ -23,7 +23,7 @@ variable "github_repo" {
 variable "workload_account_ids" {
   description = "Map of environment names to AWS account IDs"
   type        = map(string)
-  default     = {
+  default = {
     dev  = ""
     qa   = ""
     prod = ""
@@ -33,7 +33,7 @@ variable "workload_account_ids" {
 variable "ecr_repositories" {
   description = "List of ECR repositories to create"
   type        = list(string)
-  default     = [
+  default = [
     "l-blur-model",
     "l-colors-model",
     "l-image-comparison-model",
@@ -71,5 +71,5 @@ variable "tags" {
 variable "workload_environments" {
   description = "List of environment names corresponding to workload account IDs"
   type        = list(string)
-  default     = ["qa", "dev", "prod"]  # Must be in same order as workload_account_ids values
+  default     = ["qa", "dev", "prod"] # Must be in same order as workload_account_ids values
 }

@@ -25,7 +25,7 @@ resource "random_password" "master" {
 
 # Store master credentials in Secrets Manager
 resource "aws_secretsmanager_secret" "aurora" {
-  name = "${var.project_name}-${var.env}-aurora-credentials-pg"
+  name       = "${var.project_name}-${var.env}-aurora-credentials-pg"
   kms_key_id = aws_kms_key.aurora.arn
 
   tags = merge(var.tags, {
@@ -78,7 +78,7 @@ resource "aws_security_group_rule" "aurora_ingress" {
   protocol                 = "tcp"
   source_security_group_id = var.lambda_security_group_id
   security_group_id        = aws_security_group.aurora.id
-  description             = "Allow PostgreSQL access from Lambda functions"
+  description              = "Allow PostgreSQL access from Lambda functions"
 }
 
 resource "aws_security_group_rule" "aurora_public_access" {
@@ -94,7 +94,7 @@ resource "aws_security_group_rule" "aurora_public_access" {
 # Parameter group
 resource "aws_rds_cluster_parameter_group" "aurora" {
   family = "aurora-postgresql16"
-  name   = "${var.project_name}-${var.env}-aurora-pg-16"  #
+  name   = "${var.project_name}-${var.env}-aurora-pg-16" #
 
   parameter {
     name  = "log_statement"
@@ -103,7 +103,7 @@ resource "aws_rds_cluster_parameter_group" "aurora" {
 
   parameter {
     name  = "log_min_duration_statement"
-    value = "1000"  # Log queries that take more than 1 second
+    value = "1000" # Log queries that take more than 1 second
   }
 
   tags = merge(var.tags, {
@@ -114,19 +114,19 @@ resource "aws_rds_cluster_parameter_group" "aurora" {
 
 # Aurora Serverless v2 Cluster
 resource "aws_rds_cluster" "aurora" {
-  cluster_identifier     = "${var.project_name}-${var.env}-aurora"
-  engine                = "aurora-postgresql"
-  engine_mode           = "provisioned"
-  engine_version        = var.engine_version
-  database_name         = var.database_name
-  master_username       = var.master_username
-  master_password       = random_password.master.result
-  
+  cluster_identifier = "${var.project_name}-${var.env}-aurora"
+  engine             = "aurora-postgresql"
+  engine_mode        = "provisioned"
+  engine_version     = var.engine_version
+  database_name      = var.database_name
+  master_username    = var.master_username
+  master_password    = random_password.master.result
+
   db_subnet_group_name   = aws_db_subnet_group.aurora.name
   vpc_security_group_ids = [aws_security_group.aurora.id]
-  
-  storage_encrypted     = true
-  kms_key_id           = aws_kms_key.aurora.arn
+
+  storage_encrypted = true
+  kms_key_id        = aws_kms_key.aurora.arn
 
   performance_insights_enabled = true
 
@@ -136,14 +136,14 @@ resource "aws_rds_cluster" "aurora" {
   }
 
   # Backup configuration
-  backup_retention_period = var.backup_retention_days
-  preferred_backup_window = var.backup_window
-  copy_tags_to_snapshot  = true
-  allow_major_version_upgrade = true 
-  
+  backup_retention_period     = var.backup_retention_days
+  preferred_backup_window     = var.backup_window
+  copy_tags_to_snapshot       = true
+  allow_major_version_upgrade = true
+
   # Maintenance window
   preferred_maintenance_window = var.maintenance_window
-  
+
   # Enable Data API
   enable_http_endpoint = true
 
@@ -153,7 +153,7 @@ resource "aws_rds_cluster" "aurora" {
   # Enable deletion protection in production
   deletion_protection = var.env == "prod" ? true : false
 
-  skip_final_snapshot = var.env != "prod"
+  skip_final_snapshot       = var.env != "prod"
   final_snapshot_identifier = var.env == "prod" ? "${var.project_name}-${var.env}-aurora-final-${formatdate("YYYY-MM-DD-hh-mm", timestamp())}" : null
 
   tags = merge(var.tags, {
@@ -168,16 +168,16 @@ resource "aws_rds_cluster_instance" "aurora" {
 
   identifier         = "${var.project_name}-${var.env}-aurora-${count.index + 1}"
   cluster_identifier = aws_rds_cluster.aurora.id
-  
-  instance_class     = "db.serverless"
-  engine            = aws_rds_cluster.aurora.engine
-  engine_version    = aws_rds_cluster.aurora.engine_version
+
+  instance_class      = "db.serverless"
+  engine              = aws_rds_cluster.aurora.engine
+  engine_version      = aws_rds_cluster.aurora.engine_version
   publicly_accessible = var.publicly_accessible
 
   # Enable Performance Insights
   performance_insights_enabled    = true
   performance_insights_kms_key_id = aws_kms_key.aurora.arn
-  
+
   # Enable enhanced monitoring
   monitoring_interval = 30
   monitoring_role_arn = aws_iam_role.enhanced_monitoring.arn
@@ -225,5 +225,5 @@ resource "aws_security_group_rule" "aurora_eks_ingress" {
   protocol                 = "tcp"
   source_security_group_id = var.eks_node_security_group_id
   security_group_id        = aws_security_group.aurora.id
-  description             = "Allow PostgreSQL access from EKS nodes"
+  description              = "Allow PostgreSQL access from EKS nodes"
 }

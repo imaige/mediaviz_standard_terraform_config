@@ -10,7 +10,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # IAM role for GitHub Actions with trust relationship
 resource "aws_iam_role" "github_actions" {
   name = "${var.project_name}-${var.env}-github-actions-role"
-  
+
   # Trust policy for GitHub OIDC provider
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -33,7 +33,7 @@ resource "aws_iam_role" "github_actions" {
       }
     ]
   })
-  
+
   tags = merge(var.tags, {
     Environment = var.env
     Terraform   = "true"

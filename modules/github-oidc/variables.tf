@@ -26,7 +26,7 @@ variable "aws_region" {
 variable "aws_account_id" {
   description = "AWS account ID"
   type        = string
-  default     = ""  # If not provided, current account ID will be used
+  default     = "" # If not provided, current account ID will be used
 }
 
 variable "account_type" {

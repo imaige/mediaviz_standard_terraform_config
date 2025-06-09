@@ -5,7 +5,7 @@ locals {
   default_repositories = [
     "l-blur-model",
     "l-colors-model",
-    "l-image-comparison-model", 
+    "l-image-comparison-model",
     "l-facial-recognition-model",
     "eks-feature-extraction-model",
     "eks-image-comparison-model",
@@ -17,10 +17,10 @@ locals {
     "eks-external-api",
     "eks-personhood-model",
   ]
-  
+
   # Use provided repositories if specified, otherwise use defaults
   repositories = length(var.ecr_repositories) > 0 ? var.ecr_repositories : local.default_repositories
-  
+
   # Normalize tags
   normalized_tags = merge(var.tags, {
     Environment = var.env
@@ -32,16 +32,16 @@ resource "aws_ecr_repository" "lambda_repos" {
   for_each = toset(local.repositories)
 
   name = "${var.project_name}-${var.env}-${each.value}"
-  
-  image_tag_mutability = "MUTABLE"  # Allows overwriting of tags like 'latest'
-  
+
+  image_tag_mutability = "MUTABLE" # Allows overwriting of tags like 'latest'
+
   image_scanning_configuration {
     scan_on_push = true
   }
 
   encryption_configuration {
     encryption_type = "KMS"
-    kms_key        = var.kms_key_arn
+    kms_key         = var.kms_key_arn
   }
 
   tags = merge(local.normalized_tags, {
@@ -62,10 +62,10 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
         rulePriority = 1
         description  = "Keep only the newest image tagged as 'dev'"
         selection = {
-          tagStatus     = "tagged"
+          tagStatus      = "tagged"
           tagPatternList = ["dev"]
-          countType     = "imageCountMoreThan"
-          countNumber   = 1
+          countType      = "imageCountMoreThan"
+          countNumber    = 1
         }
         action = {
           type = "expire"
@@ -75,10 +75,10 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
         rulePriority = 2
         description  = "Keep only the newest image tagged as 'qa'"
         selection = {
-          tagStatus     = "tagged"
+          tagStatus      = "tagged"
           tagPatternList = ["qa"]
-          countType     = "imageCountMoreThan"
-          countNumber   = 1
+          countType      = "imageCountMoreThan"
+          countNumber    = 1
         }
         action = {
           type = "expire"
@@ -88,10 +88,10 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
         rulePriority = 3
         description  = "Keep only the newest image tagged as 'prod'"
         selection = {
-          tagStatus     = "tagged"
+          tagStatus      = "tagged"
           tagPatternList = ["prod"]
-          countType     = "imageCountMoreThan"
-          countNumber   = 1
+          countType      = "imageCountMoreThan"
+          countNumber    = 1
         }
         action = {
           type = "expire"
@@ -101,9 +101,9 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
         rulePriority = 4
         description  = "Keep newest 5 untagged or other tagged images"
         selection = {
-          tagStatus     = "any"
-          countType     = "imageCountMoreThan"
-          countNumber   = 5
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 5
         }
         action = {
           type = "expire"
@@ -116,10 +116,10 @@ resource "aws_ecr_lifecycle_policy" "lambda_repos" {
 # Authorization token policy for cross-account access
 resource "aws_iam_policy" "ecr_auth_token" {
   count = length(var.cross_account_arns) > 0 ? 1 : 0
-  
+
   name        = "${var.project_name}-${var.env}-ecr-auth-token"
   description = "Policy allowing ECR GetAuthorizationToken for cross-account access"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -130,7 +130,7 @@ resource "aws_iam_policy" "ecr_auth_token" {
       }
     ]
   })
-  
+
   tags = local.normalized_tags
 }
 
@@ -145,7 +145,7 @@ data "aws_iam_policy_document" "lambda_repos" {
     effect = "Allow"
 
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = startswith(each.value, "l-") ? ["lambda.amazonaws.com"] : ["eks.amazonaws.com"]
     }
 

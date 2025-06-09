@@ -16,16 +16,29 @@ locals {
       needs_helm = true
     }
     "evidence-model" = {
-      short_name = "evidence-model"
-      needs_sqs  = false
-      needs_helm = true
+      short_name      = "evidence-model"
+      needs_sqs       = false
+      needs_helm      = true
+      dedicated_nodes = true
+      node_selector = {
+        "node-type"     = "high-power-gpu"
+        "workload-type" = "evidence-model"
+      }
+      tolerations = [
+        {
+          key      = "evidence-model"
+          value    = "dedicated"
+          effect   = "NoSchedule"
+          operator = "Equal"
+        }
+      ]
     }
     "similarity-model" = {
       short_name = "similarity-model"
       needs_sqs  = false
       needs_helm = true
     }
-      "similarity-set-sorting-service" = {
+    "similarity-set-sorting-service" = {
       short_name = "similarity-set-sorting-service"
       needs_sqs  = false
       needs_helm = true
@@ -184,10 +197,10 @@ resource "aws_iam_role_policy" "model_policies" {
 # Custom policy for personhood model to allow Rekognition permissions
 resource "aws_iam_role_policy" "personhood_rekognition_policy" {
   count = contains(keys(local.models), "personhood-model") ? 1 : 0
-  
+
   name = "${var.project_name}-${var.env}-eks-personhood-rekognition-policy"
   role = aws_iam_role.model_role["personhood-model"].id
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -220,30 +233,31 @@ resource "aws_iam_role_policy" "personhood_rekognition_policy" {
 
 # Optional: Cross-account role assumption policy
 # Add an explicit variable to control creation of these policies
-resource "aws_iam_role_policy" "assume_shared_role" {
-  # Only create if both variables are set appropriately
-  for_each = (var.shared_role_arn != "" && var.enable_shared_role_assumption) ? local.models : {}
+# resource "aws_iam_role_policy" "assume_shared_role" {
+#   # Only create if both variables are set appropriately
+#   count = 0  # Disable this resource temporarily
+#
+#   name = "${var.project_name}-${var.env}-eks-${each.key}-assume-shared-role"
+#   role = aws_iam_role.model_role[each.key].id
+#
+#   # Ensure we have a valid ARN format to avoid errors
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect   = "Allow"
+#         Action   = "sts:AssumeRole"
+#         Resource = var.shared_role_arn
+#       }
+#     ]
+#   })
 
-  name = "${var.project_name}-${var.env}-eks-${each.key}-assume-shared-role"
-  role = aws_iam_role.model_role[each.key].id
-
-  # Ensure we have a valid ARN format to avoid errors
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = "sts:AssumeRole"
-        Resource = var.shared_role_arn
-      }
-    ]
-  })
-
-  # Add explicit dependency to ensure the role exists before creating the policy
-  depends_on = [
-    aws_iam_role.model_role
-  ]
-}
+# 
+#   # Add explicit dependency to ensure the role exists before creating the policy
+#   depends_on = [
+#     aws_iam_role.model_role
+#   ]
+# }
 
 # Create Kubernetes service accounts for models
 # resource "kubernetes_service_account" "model_service_accounts" {
@@ -267,113 +281,127 @@ resource "aws_iam_role_policy" "assume_shared_role" {
 # }
 
 # Using Helm to deploy models (simplified to avoid templatefile)
-# resource "helm_release" "model_deployments" {
-#   for_each = var.enable_helm_deployments ? local.helm_models : {}
+resource "helm_release" "model_deployments" {
+  for_each = var.enable_helm_deployments ? local.helm_models : tomap({})
 
-#   name      = "eks-${each.value.short_name}"
-#   namespace = var.namespace
-#   # Use the public or internal Helm chart repository
-#   repository = var.helm_repository
-#   chart      = var.helm_chart_name
-#   version    = var.helm_chart_version
+  name      = "eks-${each.value.short_name}"
+  namespace = var.namespace
+  # Use the local Helm chart
+  chart      = "${path.module}/chart"
 
-#   create_namespace = true
-#   wait             = true
-#   atomic           = true
-#   timeout          = var.helm_timeout
+  create_namespace = true
+  wait             = true
+  atomic           = true
+  timeout          = var.helm_timeout
 
-#   # Use inline values instead of templatefile
-#   set {
-#     name  = "image.repository"
-#     value = local.repository_urls[each.key]
-#   }
+  # Use inline values instead of templatefile
+  set {
+    name  = "image.repository"
+    value = local.repository_urls[each.key]
+  }
 
-#   set {
-#     name  = "image.tag"
-#     value = var.image_tag
-#   }
+  set {
+    name  = "image.tag"
+    value = var.image_tag
+  }
 
-#   set {
-#     name  = "replicaCount"
-#     value = var.replicas
-#   }
+  set {
+    name  = "replicas"
+    value = lookup(var.model_replicas, each.key, var.replicas)
+  }
 
-#   set {
-#     name  = "serviceAccount.name"
-#     value = "eks-${each.value.short_name}"
-#   }
+  set {
+    name  = "serviceAccount.name"
+    value = "eks-processor-${each.value.short_name}"
+  }
 
-#   set {
-#     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-#     value = aws_iam_role.model_role[each.key].arn
-#   }
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.model_role[each.key].arn
+  }
 
-#   set {
-#     name  = "env.AWS_REGION"
-#     value = var.aws_region
-#   }
+  set {
+    name  = "env.AWS_REGION"
+    value = var.aws_region
+  }
 
-#   set {
-#     name  = "env.ENVIRONMENT"
-#     value = var.env
-#   }
+  set {
+    name  = "env.ENVIRONMENT"
+    value = var.env
+  }
 
-#   set {
-#     name  = "env.MODEL_NAME"
-#     value = each.key
-#   }
+  set {
+    name  = "env.MODEL_NAME"
+    value = each.key
+  }
 
-#   set {
-#     name  = "env.DB_CLUSTER_ARN"
-#     value = var.aurora_cluster_arn
-#   }
+  set {
+    name  = "env.DB_CLUSTER_ARN"
+    value = var.aurora_cluster_arn
+  }
 
-#   set {
-#     name  = "env.DB_SECRET_ARN"
-#     value = var.aurora_secret_arn
-#   }
+  set {
+    name  = "env.DB_SECRET_ARN"
+    value = var.aurora_secret_arn
+  }
 
-#   set {
-#     name  = "env.DB_NAME"
-#     value = var.aurora_database_name
-#   }
+  set {
+    name  = "env.DB_NAME"
+    value = var.aurora_database_name
+  }
 
-#   # Conditionally set SQS URL if needed
-#   dynamic "set" {
-#     for_each = each.value.needs_sqs ? [1] : []
-#     content {
-#       name  = "env.SQS_QUEUE_URL"
-#       value = lookup(var.sqs_queues, each.key, "")
-#     }
-#   }
+  # Conditionally set SQS URL if needed
+  dynamic "set" {
+    for_each = each.value.needs_sqs ? [1] : []
+    content {
+      name  = "env.SQS_QUEUE_URL"
+      value = lookup(var.sqs_queues, each.key, "")
+    }
+  }
 
-#   # Resource limits
-#   set {
-#     name  = "resources.limits.cpu"
-#     value = var.cpu_limit
-#   }
+  # Resource limits
+  set {
+    name  = "resources.limits.cpu"
+    value = var.cpu_limit
+  }
 
-#   set {
-#     name  = "resources.limits.memory"
-#     value = var.memory_limit
-#   }
+  set {
+    name  = "resources.limits.memory"
+    value = var.memory_limit
+  }
 
-#   set {
-#     name  = "resources.requests.cpu"
-#     value = var.cpu_request
-#   }
+  set {
+    name  = "resources.requests.cpu"
+    value = var.cpu_request
+  }
 
-#   set {
-#     name  = "resources.requests.memory"
-#     value = var.memory_request
-#   }
+  set {
+    name  = "resources.requests.memory"
+    value = var.memory_request
+  }
 
-#   depends_on = [
-#     aws_iam_role.model_role,
-#     aws_iam_role_policy.model_policies,
-#     kubernetes_service_account.model_service_accounts
-#   ]
-# }
+  # Node selector for evidence model
+  dynamic "set" {
+    for_each = lookup(each.value, "dedicated_nodes", false) ? [1] : []
+    content {
+      name  = "nodeSelector.node-type"
+      value = "high-power-gpu"
+    }
+  }
+
+  dynamic "set" {
+    for_each = lookup(each.value, "dedicated_nodes", false) ? [1] : []
+    content {
+      name  = "nodeSelector.workload-type"
+      value = "evidence-model"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.model_role,
+    aws_iam_role_policy.model_policies
+  ]
+}
 
 # Get current account ID
 data "aws_caller_identity" "current" {}
@@ -391,12 +419,12 @@ output "all_role_arns" {
   value       = values(aws_iam_role.model_role)[*].arn
 }
 
-# output "helm_releases" {
-#   description = "Names of the deployed Helm releases"
-#   value = {
-#     for k, v in helm_release.model_deployments : k => v.name
-#   }
-# }
+output "helm_releases" {
+  description = "Names of the deployed Helm releases"
+  value = var.enable_helm_deployments ? {
+    for k, v in helm_release.model_deployments : k => v.name
+  } : {}
+}
 
 # output "service_account_names" {
 #   description = "Names of the Kubernetes service accounts created"

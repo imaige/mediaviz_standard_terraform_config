@@ -17,7 +17,7 @@ provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-    
+
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
@@ -29,13 +29,13 @@ provider "helm" {
 
 # Add a wait condition to ensure the cluster is available before applying RBAC
 resource "time_sleep" "wait_for_cluster" {
-  depends_on = [module.eks]
+  depends_on      = [module.eks]
   create_duration = "30s"
 }
 
 # Create a ClusterRoleBinding for admin users
 resource "kubernetes_cluster_role_binding" "admin_users" {
-  count = var.create_kubernetes_resources ? 1 : 0
+  count      = var.create_kubernetes_resources ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {
@@ -63,7 +63,7 @@ resource "kubernetes_cluster_role_binding" "admin_users" {
 
 # Create a Role and RoleBinding for developers (optional)
 resource "kubernetes_role" "developer" {
-  count = var.create_developer_role ? 1 : 0
+  count      = var.create_developer_role ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {
@@ -88,7 +88,7 @@ resource "kubernetes_role" "developer" {
 }
 
 resource "kubernetes_role_binding" "developer" {
-  count = var.create_developer_role ? 1 : 0
+  count      = var.create_developer_role ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {
@@ -114,7 +114,7 @@ resource "kubernetes_role_binding" "developer" {
 
 # Create a ClusterRole and ClusterRoleBinding for MediavizDevelopers group
 resource "kubernetes_cluster_role" "mediaviz_developer" {
-  count = var.create_developer_role ? 1 : 0
+  count      = var.create_developer_role ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {
@@ -156,7 +156,7 @@ resource "kubernetes_cluster_role" "mediaviz_developer" {
 }
 
 resource "kubernetes_cluster_role_binding" "mediaviz_developer" {
-  count = var.create_developer_role ? 1 : 0
+  count      = var.create_developer_role ? 1 : 0
   depends_on = [time_sleep.wait_for_cluster]
 
   metadata {

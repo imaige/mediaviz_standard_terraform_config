@@ -6,36 +6,91 @@ module "vpc" {
   env          = var.env
 }
 
+module "security" {
+  source = "./../../modules/security"
+
+  project_name            = var.project_name
+  env                     = var.env
+  kms_key_arn             = null             # Will be created by the module
+  kms_key_id              = null             # Will be created by the module
+  cluster_name            = var.cluster_name # Reference before creation, will be updated
+  enable_sso              = false
+  github_actions_role_arn = module.github_oidc.role_arn
+
+  tags = var.tags
+}
+
 module "eks" {
   source = "./../../modules/eks"
 
+  project_name    = var.project_name
   cluster_name    = var.cluster_name
   env             = var.env
   cluster_version = var.cluster_version
+  aws_region      = data.aws_region.current.name
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
 
-  # Primary node group configuration
   eks_primary_instance_type = var.eks_primary_instance_type
   node_group_min_size       = var.node_group_min_size
   node_group_max_size       = var.node_group_max_size
   node_group_desired_size   = var.node_group_desired_size
 
-  # GPU node group configuration
+  # Use GPU instance types variable
   gpu_instance_types    = var.gpu_instance_types
   gpu_node_min_size     = var.gpu_node_min_size
   gpu_node_max_size     = var.gpu_node_max_size
   gpu_node_desired_size = var.gpu_node_desired_size
 
-  # Install NVIDIA plugin for GPU support
-  install_nvidia_plugin = true
+  # Evidence model dedicated GPU nodes
+  evidence_gpu_instance_types    = var.evidence_gpu_instance_types
+  evidence_gpu_node_min_size     = var.evidence_gpu_node_min_size
+  evidence_gpu_node_max_size     = var.evidence_gpu_node_max_size
+  evidence_gpu_node_desired_size = var.evidence_gpu_node_desired_size
 
-  aws_account_id     = var.aws_account_id
+  aws_account_id     = data.aws_caller_identity.current.account_id
   kms_key_arn        = module.security.kms_key_arn
-  kms_key_id         = module.security.kms_key_id
   eks_admin_role_arn = module.security.eks_admin_role_arn
+
+  # Add SQS, S3, and Aurora access
+  sqs_queue_arns = values(module.sqs.lambda_queue_arns)
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    "${module.s3.bucket_arn}/*"
+  ]
+  aurora_cluster_arns = [module.aurora.cluster_arn]
+
+  # Cross account access
+  enable_shared_access   = true
+  shared_access_role_arn = module.cross_account_roles.role_arn
+
+  # Enable developer role for MediavizDevelopers group
+  create_developer_role = true
+
+  install_nvidia_plugin       = true
+  create_kubernetes_resources = true
+
+  additional_access_entries = {
+    caleb_sso = {
+      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_e2f331b752f1e129"
+      type              = "STANDARD"
+    },
+    dmitrii_sso = {
+      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSAdministratorAccess_472a40aff28af737"
+      type              = "STANDARD"
+    },
+    mediaviz_developers = {
+      kubernetes_groups = ["MediavizDevelopers"]
+      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_1b02cabbd428e5e0"
+      type              = "STANDARD"
+    }
+  }
+
+  tags = var.tags
 }
 
 # New Serverless Infrastructure
@@ -48,7 +103,9 @@ module "s3" {
   retention_days       = var.retention_days
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
-  replica_kms_key_id   = module.security.kms_key_id
+  cross_account_arns   = [] # No cross-account access needed for this bucket
+
+  tags = var.tags
 }
 
 module "lambda_upload" {
@@ -79,16 +136,24 @@ module "lambda_processors" {
 
   project_name = var.project_name
   env          = var.env
+  aws_region   = data.aws_region.current.name
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
 
-  # ECR configurations - Updated to use shared account ECR repositories
-  ecr_repository_url  = "${var.shared_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-shared"
-  # We're not using local ECR repositories anymore, so we use an empty list or shared repositories ARNs
-  ecr_repository_arns = local.shared_ecr_repository_arns
+  # ECR configurations - use shared account repositories
+  ecr_repository_url        = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${var.project_name}-${var.env}"
+  shared_ecr_repository_url = "${data.terraform_remote_state.shared.outputs.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${var.project_name}-shared"
+  ecr_repository_arns       = local.shared_ecr_repository_arns
 
-  # SQS configurations - use the map of queue ARNs
+  # S3 buckets that Lambda needs access to
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    # Access to shared account helm charts bucket
+    data.terraform_remote_state.shared.outputs.s3_helm_charts_bucket.arn
+  ]
+
+  # SQS configurations 
   sqs_queues = {
     l-blur-model               = module.sqs.lambda_queue_arns["lambda-blur-model"]
     l-colors-model             = module.sqs.lambda_queue_arns["lambda-colors-model"]
@@ -104,6 +169,11 @@ module "lambda_processors" {
   aurora_security_group_id = module.aurora.security_group_id
   aurora_kms_key_arn       = module.aurora.kms_key_arn
 
+  # Lambda scaling and concurrency
+  batch_size      = 1
+  batch_window    = 0
+  max_concurrency = 1000
+
   tags = var.tags
 }
 
@@ -117,6 +187,7 @@ module "api_gateway" {
   kms_key_arn          = module.security.kms_key_arn
   kms_key_id           = module.security.kms_key_id
   waf_acl_arn          = module.security.waf_acl_arn
+
 }
 
 module "eventbridge" {
@@ -126,12 +197,12 @@ module "eventbridge" {
   env          = var.env
 
   sqs_queues = {
-    l-blur-model                 = module.sqs.lambda_queue_arns["lambda-blur-model"]
-    l-colors-model               = module.sqs.lambda_queue_arns["lambda-colors-model"]
-    l-image-comparison-model     = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
-    l-facial-recognition-model   = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
+    l-blur-model                   = module.sqs.lambda_queue_arns["lambda-blur-model"]
+    l-colors-model                 = module.sqs.lambda_queue_arns["lambda-colors-model"]
+    l-image-comparison-model       = module.sqs.lambda_queue_arns["lambda-image-comparison-model"]
+    l-facial-recognition-model     = module.sqs.lambda_queue_arns["lambda-facial-recognition-model"]
     eks-image-classification-model = module.sqs.eks_queue_arns["eks-image-classification-model"]
-    eks-feature-extraction-model = module.sqs.eks_queue_arns["eks-feature-extraction-model"]
+    eks-feature-extraction-model   = module.sqs.eks_queue_arns["eks-feature-extraction-model"]
   }
 
   dlq_arn = module.sqs.dlq_arn
@@ -159,7 +230,6 @@ module "sqs" {
   lambda_role_arns = module.lambda_processors.all_role_arns
   eks_role_arn     = module.eks.node_group_role_arn
 
-
   # Optional: Module-specific configurations
   model_specific_config = {
     "lambda-module1" = {
@@ -178,24 +248,6 @@ module "sqs" {
   tags = var.tags
 }
 
-module "security" {
-  source = "./../../modules/security"
-
-  project_name = var.project_name
-  env          = var.env
-  kms_key_arn  = module.security.kms_key_arn
-  kms_key_id   = module.security.kms_key_id
-  # eks_node_role_arn = module.eks.eks_managed_node_role_arn
-  tags = var.tags
-  cluster_name = module.eks.cluster_name
-
-}
-
-# module "eks_functions" {
-#   source = "./../../modules/eks_functions"
-
-# }
-
 module "aurora" {
   source = "./../../modules/aurora"
 
@@ -210,8 +262,9 @@ module "aurora" {
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 
-  min_capacity = 0.5
-  max_capacity = 16
+  instance_count = 1 # Single instance for dev
+  min_capacity   = 0.5 # Start lower for dev
+  max_capacity   = 16 # Much lower ceiling for dev
 
   tags = var.tags
 }
@@ -223,88 +276,156 @@ module "bastion" {
   env              = var.env
   vpc_id           = module.vpc.vpc_id
   public_subnet_id = module.vpc.public_subnets[0]
-  allowed_ips = [
-    "24.5.226.154/32",
-    "73.169.81.101/32",
-    "67.241.163.178/32",
-    "76.155.77.153/32",
-    "136.29.106.130/32",
-    "67.162.158.188/32",
-    "136.36.145.192/32",
-    "135.129.132.20/32"
-  ]
-  aurora_endpoint = module.aurora.cluster_endpoint
-  tags            = var.tags
+  allowed_ips      = var.bastion_allowed_ips
+  aurora_endpoint  = module.aurora.cluster_endpoint
+
+  tags = var.tags
 }
 
-# Remove the ECR module since we're using the shared account repositories
+# Remove the ECR module in workload accounts - use shared account ECR instead
 # module "ecr" {
 #   source = "./../../modules/ecr"
-#
-#   project_name = var.project_name
-#   env          = var.env
-#   kms_key_arn  = module.security.kms_key_arn
-#
-#   cross_account_arns = [] # Add any cross-account ARNs if needed
-#
-#   tags = var.tags
+#   ...
 # }
+
+# This is just the updated part of your modules.tf file
 
 module "eks_processors" {
   source = "./../../modules/eks_processors"
 
   project_name = var.project_name
   env          = var.env
-  aws_region   = var.aws_region
+  aws_region   = data.aws_region.current.name
 
+  # Shared services configuration
+  shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+  shared_role_arn   = data.terraform_remote_state.shared.outputs.cross_account_role_arn
+
+  # Disable shared role assumption temporarily until we resolve the errors
+  enable_shared_role_assumption = false
+
+  # Aurora configurations
   aurora_cluster_arn   = module.aurora.cluster_arn
   aurora_secret_arn    = module.aurora.secret_arn
   aurora_database_name = module.aurora.database_name
 
-  namespace     = "default"
-  chart_version = "0.1.0"
-  # Use 1 replica for each pod type as per requirements
-  replicas      = 1
+  # Kubernetes namespace
+  namespace = "default"
 
+  # SQS configuration
   sqs_queues = {
     "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
     "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
   }
 
+  # Security and identity
   kms_key_arn       = module.security.kms_key_arn
   oidc_provider     = module.eks.oidc_provider
   oidc_provider_arn = module.eks.oidc_provider_arn
 
+  # S3 bucket access
+  s3_bucket_arns = [
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
+  ]
+
+  # Set enable_helm_deployments to false for now while we set up the infrastructure
+  enable_helm_deployments = true
+
+  # Resource settings
+  replicas       = 1
+  model_replicas = {
+    "evidence-model"             = 1
+    "image-classification-model" = 2
+    "feature-extraction-model"   = 1
+    "external-api"               = 1
+    "similarity-model"           = 1
+    "similarity-set-sorting-service" = 1
+    "personhood-model"           = 1
+  }
+  cpu_request    = "100m"
+  memory_request = "128Mi"
+  cpu_limit      = "500m"
+  memory_limit   = "512Mi"
+
   tags = var.tags
 }
-
-# Add cross-account role module
 module "cross_account_roles" {
-  source = "./../../modules/cross-account-roles"
-  
+  source = "../../modules/cross-account-roles"
+
   project_name = var.project_name
-  env          = var.env
   account_type = "workload"
-  
-  # This role will be used to access the shared account resources
+  env          = var.env
+
+  # Use OIDC provider ARN from GitHub Actions
   github_actions_role_arn = module.github_oidc.role_arn
-  shared_role_arn         = var.shared_role_arn
-  
+
+  # Reference shared account role using remote state
+  shared_role_arn = data.terraform_remote_state.shared.outputs.cross_account_role_arn
+
+  # Access specific ECR repositories
+  ecr_repository_arns = [
+    for repo in var.shared_ecr_repositories :
+    "arn:aws:ecr:${data.aws_region.current.name}:${data.terraform_remote_state.shared.outputs.account_id}:repository/${var.project_name}-shared-${repo}"
+  ]
+
+  # Access shared S3 buckets
+  s3_bucket_arns = [
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
+  ]
+
+  # Add KMS keys
+  kms_key_arns = [
+    data.terraform_remote_state.shared.outputs.kms_key_arn
+  ]
+
   tags = var.tags
 }
 
-# Add GitHub OIDC provider module
 module "github_oidc" {
-  source = "./../../modules/github-oidc"
-  
-  project_name = var.project_name
-  env          = var.env
-  github_org   = var.github_org
-  github_repo  = var.github_repo
-  account_type = "workload"
-  
-  # Allow GitHub Actions to assume the cross-account role
-  cross_account_roles = [module.cross_account_roles.role_arn]
-  
+  source = "../../modules/github-oidc"
+
+  project_name   = var.project_name
+  env            = var.env
+  github_org     = var.github_org
+  github_repo    = var.github_repo
+  account_type   = "workload"
+  aws_region     = data.aws_region.current.name
+  aws_account_id = data.aws_caller_identity.current.account_id
+
+  # Add KMS key ARNs
+  kms_key_arns = [module.security.kms_key_arn]
+
+  # Access to shared ECR repositories
+  shared_ecr_arns = [
+    for repo in var.shared_ecr_repositories :
+    "arn:aws:ecr:${data.aws_region.current.name}:${data.terraform_remote_state.shared.outputs.account_id}:repository/${var.project_name}-shared-${repo}"
+  ]
+
+  # Access to shared S3 buckets
+  shared_s3_arns = [
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
+  ]
+
+  # Cross-account role to assume
+  cross_account_roles = [
+    data.terraform_remote_state.shared.outputs.cross_account_role_arn
+  ]
+
+  enable_cicd_permissions = true
+
   tags = var.tags
 }
+
+# Define locals for shared account resources
+# locals {
+#   #shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+
+#   # Convert shared ECR repository ARNs to a list
+#   shared_ecr_repository_arns = [
+#     for repo in var.shared_ecr_repositories : 
+#     "arn:aws:ecr:${data.aws_region.current.name}:${local.shared_account_id}:repository/${var.project_name}-shared-${repo}"
+#   ]
+# }

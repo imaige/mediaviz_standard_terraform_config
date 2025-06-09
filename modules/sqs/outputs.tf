@@ -16,10 +16,10 @@ output "model_queues" {
   description = "Map of all model queue details"
   value = {
     for k, v in aws_sqs_queue.model_queues : k => {
-      arn         = v.arn
-      url         = v.url
-      name        = v.name
-      queue_type  = can(regex("^lambda-", k)) ? "lambda" : "eks"
+      arn        = v.arn
+      url        = v.url
+      name       = v.name
+      queue_type = can(regex("^lambda-", k)) ? "lambda" : "eks"
     }
   }
 }
@@ -91,8 +91,8 @@ output "model_dlqs" {
   description = "Map of model DLQ details"
   value = var.enable_dlq ? {
     for k, v in aws_sqs_queue.model_dlqs : k => {
-      arn = v.arn
-      url = v.url
+      arn  = v.arn
+      url  = v.url
       name = v.name
     }
   } : {}

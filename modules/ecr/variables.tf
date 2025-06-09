@@ -23,7 +23,7 @@ variable "cross_account_arns" {
 variable "ecr_repositories" {
   description = "List of ECR repositories to create"
   type        = list(string)
-  default     = []  # Empty default allows the module to use its internal local.repositories if not specified
+  default     = [] # Empty default allows the module to use its internal local.repositories if not specified
 }
 
 variable "tags" {

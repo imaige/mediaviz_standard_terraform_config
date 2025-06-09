@@ -26,9 +26,9 @@ resource "aws_lambda_function" "image_upload" {
   runtime       = var.lambda_runtime
   memory_size   = var.memory_size
   timeout       = var.timeout
-  layers = ["arn:aws:lambda:us-east-2:515966522375:layer:PythonJose:1"] # Define it as it should be
+  layers        = ["arn:aws:lambda:us-east-2:515966522375:layer:PythonJose:1"] # Define it as it should be
 
-  
+
 
   vpc_config {
     subnet_ids         = var.subnet_ids
@@ -41,7 +41,7 @@ resource "aws_lambda_function" "image_upload" {
       DB_SECRET_ARN  = var.aurora_secret_arn    # Add this
       DB_CLUSTER_ARN = var.aurora_cluster_arn   # Add this
       DB_NAME        = var.aurora_database_name # Add this
-      SECRET_KEY = "cdc1dc3e9c0abec342fed61bec7c6c5e97d4ec484be37df8b8acce6a0286d127d16a44e55c73ddfe30d981c1ad36855d8b73c44a19076d51e7326f546dfa76f5"
+      SECRET_KEY     = "cdc1dc3e9c0abec342fed61bec7c6c5e97d4ec484be37df8b8acce6a0286d127d16a44e55c73ddfe30d981c1ad36855d8b73c44a19076d51e7326f546dfa76f5"
     }
   }
 
@@ -56,7 +56,7 @@ resource "aws_lambda_function" "image_upload" {
     mode = "Active"
   }
 
-  reserved_concurrent_executions = null
+  reserved_concurrent_executions = 500
 
   tags = merge(local.normalized_tags, {
     environment = var.env

@@ -83,13 +83,13 @@ variable "enable_helm_deployments" {
 variable "helm_repository" {
   description = "Helm chart repository URL"
   type        = string
-  default     = "https://charts.bitnami.com/bitnami"  # Example default
+  default     = "https://charts.bitnami.com/bitnami" # Example default
 }
 
 variable "helm_chart_name" {
   description = "Name of the Helm chart to deploy"
   type        = string
-  default     = "nginx"  # Example default
+  default     = "nginx" # Example default
 }
 
 variable "helm_chart_version" {
@@ -114,6 +114,12 @@ variable "replicas" {
   description = "Number of replicas for each deployment"
   type        = number
   default     = 1
+}
+
+variable "model_replicas" {
+  description = "Number of replicas for each model deployment"
+  type        = map(number)
+  default     = {}
 }
 
 # Resource requests and limits

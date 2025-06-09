@@ -201,3 +201,34 @@ variable "additional_access_entries" {
   }))
   default = {}
 }
+
+variable "evidence_gpu_instance_types" {
+  description = "Instance types for the evidence model GPU node group"
+  type        = list(string)
+  default     = ["g5.4xlarge"]
+}
+
+variable "evidence_gpu_node_min_size" {
+  description = "Minimum size of the evidence GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "evidence_gpu_node_max_size" {
+  description = "Maximum size of the evidence GPU node group"
+  type        = number
+  default     = 5
+  
+}
+
+variable "evidence_gpu_node_desired_size" {
+  description = "Desired size of the evidence GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "nodegroup_version" {
+  description = "Version suffix for nodegroups to force recreation when subnets change"
+  type        = string
+  default     = "v2"
+}

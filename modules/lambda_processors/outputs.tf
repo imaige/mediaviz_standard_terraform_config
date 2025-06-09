@@ -22,10 +22,10 @@ output "role_arns" {
 
 output "all_role_arns" {
   description = "List of all IAM role ARNs"
-  value = values(aws_iam_role.processor_role)[*].arn
+  value       = values(aws_iam_role.processor_role)[*].arn
 }
 
 output "all_security_group_ids" {
   description = "List of all security group IDs"
-  value = values(aws_security_group.processor_sg)[*].id
+  value       = values(aws_security_group.processor_sg)[*].id
 }

@@ -7,7 +7,7 @@ data "aws_ssoadmin_instances" "this" {}
 # Create admin group conditionally
 resource "aws_identitystore_group" "eks_admins" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
-  
+
   display_name      = "${var.project_name}-${var.env}-eks-admins"
   description       = "EKS administrators group"
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
@@ -16,7 +16,7 @@ resource "aws_identitystore_group" "eks_admins" {
 # Get existing user from Identity Store conditionally
 data "aws_identitystore_user" "dmitrii" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
-  
+
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
 
   alternate_identifier {
@@ -30,7 +30,7 @@ data "aws_identitystore_user" "dmitrii" {
 # Add user to the group conditionally
 resource "aws_identitystore_group_membership" "dmitrii" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.identity_store_ids, [])) > 0 ? 1 : 0
-  
+
   identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
   group_id          = aws_identitystore_group.eks_admins[0].group_id
   member_id         = data.aws_identitystore_user.dmitrii[0].user_id
@@ -39,7 +39,7 @@ resource "aws_identitystore_group_membership" "dmitrii" {
 # Create permission set conditionally
 resource "aws_ssoadmin_permission_set" "eks_admin" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
-  
+
   name             = "eks-admin-${var.env}"
   description      = "EKS administrator permissions for ${var.project_name}"
   instance_arn     = tolist(data.aws_ssoadmin_instances.this.arns)[0]
@@ -66,7 +66,7 @@ resource "aws_iam_role" "eks_admin" {
           AWS = [
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
             var.github_actions_role_arn,
-            "arn:aws:iam::054037110591:role/MediaViz-Backend-Developers-Role"  # Management account role
+            "arn:aws:iam::054037110591:role/MediaViz-Backend-Developers-Role" # Management account role
           ]
         }
         Action = "sts:AssumeRole"
@@ -130,7 +130,7 @@ resource "aws_iam_role_policy" "eks_admin_custom" {
 # Add inline policy to permission set conditionally
 resource "aws_ssoadmin_permission_set_inline_policy" "eks_admin" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
-  
+
   instance_arn       = tolist(data.aws_ssoadmin_instances.this.arns)[0]
   permission_set_arn = aws_ssoadmin_permission_set.eks_admin[0].arn
 
@@ -153,7 +153,7 @@ resource "aws_ssoadmin_permission_set_inline_policy" "eks_admin" {
 # Assign the permission set to the group conditionally
 resource "aws_ssoadmin_account_assignment" "eks_admin" {
   count = var.enable_sso && length(try(data.aws_ssoadmin_instances.this.arns, [])) > 0 ? 1 : 0
-  
+
   instance_arn       = tolist(data.aws_ssoadmin_instances.this.arns)[0]
   permission_set_arn = aws_ssoadmin_permission_set.eks_admin[0].arn
 

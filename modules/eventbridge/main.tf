@@ -2,12 +2,12 @@
 
 locals {
   processors = {
-    "l-blur-model"                 = "blur_model_processing"
-    "l-colors-model"               = "colors_model_processing"
-    "l-image-comparison-model"     = "image_comparison_model_processing"
-    "l-facial-recognition-model"   = "face_recognition_model_processing"
+    "l-blur-model"                   = "blur_model_processing"
+    "l-colors-model"                 = "colors_model_processing"
+    "l-image-comparison-model"       = "image_comparison_model_processing"
+    "l-facial-recognition-model"     = "face_recognition_model_processing"
     "eks-image-classification-model" = "image_classification_model_processing"
-    "eks-feature-extraction-model" = "feature_extraction_model_processing"
+    "eks-feature-extraction-model"   = "feature_extraction_model_processing"
   }
 }
 
@@ -95,9 +95,9 @@ resource "aws_cloudwatch_event_target" "debug_target" {
 
   input_transformer {
     input_paths = {
-      source      = "$.source"
-      detailtype  = "$.detail-type"
-      detail      = "$.detail"
+      source     = "$.source"
+      detailtype = "$.detail-type"
+      detail     = "$.detail"
     }
     input_template = <<EOF
 {
