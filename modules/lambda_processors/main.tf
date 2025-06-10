@@ -7,14 +7,14 @@ locals {
     "l-image-comparison-model"   = "image_comparison_model"
     "l-facial-recognition-model" = "face_recognition_model"
   }
-  
+
   # Normalize tags for consistency
   normalized_tags = merge(var.tags, {
     Environment = var.env
     Project     = var.project_name
     ManagedBy   = "terraform"
   })
-  
+
   # Use shared repository URL if provided, else use account's own
   repository_base_url = var.shared_ecr_repository_url != "" ? var.shared_ecr_repository_url : var.ecr_repository_url
 }
@@ -24,13 +24,13 @@ resource "aws_lambda_function" "processor" {
 
   function_name = "${var.project_name}-${var.env}-${each.key}"
   role          = aws_iam_role.processor_role[each.key].arn
-  
+
   package_type = "Image"
   image_uri    = "${local.repository_base_url}-${each.key}:latest"
 
   memory_size = var.memory_size
   timeout     = var.timeout
-  
+
   # Optional reserved concurrency
   reserved_concurrent_executions = var.reserved_concurrency > 0 ? var.reserved_concurrency : null
 
@@ -41,11 +41,11 @@ resource "aws_lambda_function" "processor" {
 
   environment {
     variables = merge({
-      ENVIRONMENT     = var.env
-      DB_SECRET_ARN   = var.aurora_secret_arn
-      DB_CLUSTER_ARN  = var.aurora_cluster_arn
-      DB_NAME         = var.aurora_database_name
-      MODEL_TYPE      = each.value
+      ENVIRONMENT    = var.env
+      DB_SECRET_ARN  = var.aurora_secret_arn
+      DB_CLUSTER_ARN = var.aurora_cluster_arn
+      DB_NAME        = var.aurora_database_name
+      MODEL_TYPE     = each.value
     }, var.additional_environment_variables)
   }
 
@@ -227,8 +227,8 @@ resource "aws_iam_role_policy" "ecr_policy" {
         Resource = var.ecr_repository_arns
       },
       {
-        Effect = "Allow"
-        Action = "ecr:GetAuthorizationToken"
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
         Resource = "*"
       }
     ]
@@ -246,15 +246,11 @@ resource "aws_iam_role_policy" "s3_policy" {
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:GetObjectVersion"
+        Action = "s3:*"
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
         ]
-        Resource = concat(
-          var.s3_bucket_arns,
-          [for bucket in var.s3_bucket_arns : "${bucket}/*"]
-        )
       }
     ]
   })
@@ -263,12 +259,12 @@ resource "aws_iam_role_policy" "s3_policy" {
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   for_each = local.lambda_functions
 
-  event_source_arn = var.sqs_queues[each.key]
-  function_name    = aws_lambda_function.processor[each.key].arn
-  batch_size       = var.batch_size
+  event_source_arn                   = var.sqs_queues[each.key]
+  function_name                      = aws_lambda_function.processor[each.key].arn
+  batch_size                         = var.batch_size
   maximum_batching_window_in_seconds = var.batch_window
-  enabled          = true
-  
+  enabled                            = true
+
   scaling_config {
     maximum_concurrency = var.max_concurrency
   }

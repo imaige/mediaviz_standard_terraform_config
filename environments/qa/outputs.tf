@@ -76,10 +76,59 @@ output "github_actions_role_arn" {
 output "shared_account_resources" {
   description = "Resources from the shared account"
   value = {
-    account_id         = data.terraform_remote_state.shared.outputs.account_id
+    account_id          = data.terraform_remote_state.shared.outputs.account_id
     ecr_repository_urls = data.terraform_remote_state.shared.outputs.ecr_repository_urls
-    s3_storage_bucket  = data.terraform_remote_state.shared.outputs.s3_storage_bucket
+    s3_storage_bucket   = data.terraform_remote_state.shared.outputs.s3_storage_bucket
     s3_artifacts_bucket = data.terraform_remote_state.shared.outputs.s3_artifacts_bucket
-    kms_key_arn        = data.terraform_remote_state.shared.outputs.kms_key_arn
+    kms_key_arn         = data.terraform_remote_state.shared.outputs.kms_key_arn
   }
+}
+
+# Add this to your outputs.tf file in your workload account
+
+output "shared_account_outputs" {
+  description = "Available outputs from the shared account (for debugging)"
+  value = {
+    keys = keys(data.terraform_remote_state.shared.outputs)
+  }
+}
+
+output "shared_account_output_sample" {
+  description = "Sample of a specific output from shared account"
+  value       = try(data.terraform_remote_state.shared.outputs.ecr_repository_urls, "Not available")
+}
+
+# This will help identify what the actual S3 bucket output structure is
+output "shared_account_s3_outputs" {
+  description = "All outputs containing 's3' or 'bucket'"
+  value = {
+    for k, v in data.terraform_remote_state.shared.outputs :
+    k => v if can(regex("(s3|bucket)", lower(k)))
+  }
+}
+
+# Monitoring outputs
+output "prometheus_workspace_id" {
+  description = "ID of the AWS Managed Prometheus workspace"
+  value       = module.monitoring.prometheus_workspace_id
+}
+
+output "prometheus_workspace_endpoint" {
+  description = "Prometheus workspace endpoint for remote write"
+  value       = module.monitoring.prometheus_workspace_endpoint
+}
+
+output "grafana_workspace_id" {
+  description = "ID of the AWS Managed Grafana workspace"
+  value       = module.monitoring.grafana_workspace_id
+}
+
+output "grafana_workspace_endpoint" {
+  description = "Grafana workspace endpoint URL"
+  value       = module.monitoring.grafana_workspace_endpoint
+}
+
+output "prometheus_namespace" {
+  description = "Kubernetes namespace for Prometheus monitoring"
+  value       = module.monitoring.prometheus_namespace
 }

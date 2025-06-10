@@ -1,43 +1,24 @@
-apiVersion: v1
-replicaCount: 1
+# values.yaml
+repository: ${repository}
+tag: ${tag}
+replicas: ${replicas}
+serviceAccountName: ${service_account_name}
+serviceAccountRoleArn: ${service_account_role_arn}
 
-image:
-  repository: ${image_repository}
-  pullPolicy: Always
-  tag: ${image_tag}
-
-serviceAccount:
-  create: true
-  annotations:
-    eks.amazonaws.com/role-arn: ${role_arn}
-  name: eks-processor-${model_name}
-
-resources:
-  requests:
-    cpu: "500m"
-    memory: "1Gi"
-  limits:
-    cpu: "2000m"
-    memory: "4Gi"
-    nvidia.com/gpu: 1
-
-tolerations:
-  - key: nvidia.com/gpu
-    operator: Exists
-    effect: NoSchedule
-
+# Environment variables
 env:
-  - name: AWS_REGION
-    value: ${aws_region}
-  - name: SQS_QUEUE_URL
-    value: ${sqs_queue_url}
-  - name: ENVIRONMENT
-    value: ${environment}
-  - name: MODEL_NAME
-    value: ${model_name}
-  - name: DB_CLUSTER_ARN
-    value: ${db_cluster_arn}
-  - name: DB_SECRET_ARN
-    value: ${db_secret_arn}
-  - name: DB_NAME
-    value: ${db_name}
+  AWS_REGION: ${env_vars.AWS_REGION}
+  ENVIRONMENT: ${env_vars.ENVIRONMENT}
+  MODEL_NAME: ${env_vars.MODEL_NAME}
+  DB_CLUSTER_ARN: ${env_vars.DB_CLUSTER_ARN}
+  DB_SECRET_ARN: ${env_vars.DB_SECRET_ARN}
+  DB_NAME: ${env_vars.DB_NAME}
+  
+# Resources
+resources:
+  limits:
+    cpu: ${resources.limits.cpu}
+    memory: ${resources.limits.memory}
+  requests:
+    cpu: ${resources.requests.cpu}
+    memory: ${resources.requests.memory}

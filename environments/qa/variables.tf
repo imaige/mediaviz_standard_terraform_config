@@ -44,7 +44,7 @@ variable "eks_managed_node_groups" {
 variable "cluster_version" {
   description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.31"
+  default     = "1.32"
 }
 
 variable "cluster_addons" {
@@ -72,7 +72,7 @@ variable "tags" {
 variable "node_group_min_size" {
   description = "Minimum size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 5
 }
 
 variable "node_group_max_size" {
@@ -84,7 +84,7 @@ variable "node_group_max_size" {
 variable "node_group_desired_size" {
   description = "Desired size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 7
 }
 
 variable "cors_allowed_origins" {
@@ -168,7 +168,7 @@ variable "github_repo" {
 variable "shared_ecr_repositories" {
   description = "List of ECR repository names to access in the shared account"
   type        = list(string)
-  default     = [
+  default = [
     "l-blur-model",
     "l-colors-model",
     "l-image-comparison-model",
@@ -182,31 +182,31 @@ variable "shared_ecr_repositories" {
 variable "gpu_instance_types" {
   description = "Instance types for the GPU node group"
   type        = list(string)
-  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
+  default     = ["g4dn.xlarge"]
 }
 
 variable "gpu_node_min_size" {
   description = "Minimum size of the GPU node group"
   type        = number
-  default     = 0
+  default     = 16
 }
 
 variable "gpu_node_max_size" {
   description = "Maximum size of the GPU node group"
   type        = number
-  default     = 10
+  default     = 20
 }
 
 variable "gpu_node_desired_size" {
   description = "Desired size of the GPU node group"
   type        = number
-  default     = 0
+  default     = 16
 }
 
 variable "bastion_allowed_ips" {
   description = "List of IPs allowed to connect to the bastion host"
   type        = list(string)
-  default     = [
+  default = [
     "24.5.226.154/32",
     "73.169.81.101/32",
     "67.241.163.178/32",
@@ -217,3 +217,28 @@ variable "bastion_allowed_ips" {
     "135.129.132.20/32"
   ]
 }
+
+variable "evidence_gpu_instance_types" {
+  description = "Instance types for the evidence model GPU node group"
+  type        = list(string)
+  default     = ["g5.4xlarge"]
+}
+
+variable "evidence_gpu_node_min_size" {
+  description = "Minimum size of the evidence GPU node group"
+  type        = number
+  default     = 2
+}
+
+variable "evidence_gpu_node_max_size" {
+  description = "Maximum size of the evidence GPU node group"
+  type        = number
+  default     = 2
+}
+
+variable "evidence_gpu_node_desired_size" {
+  description = "Desired size of the evidence GPU node group"
+  type        = number
+  default     = 2
+}
+

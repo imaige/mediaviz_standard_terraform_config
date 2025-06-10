@@ -13,13 +13,13 @@ variable "env" {
 variable "visibility_timeout" {
   type        = number
   description = "The visibility timeout for the queue in seconds"
-  default     = 180  # Should match or exceed Lambda timeout
+  default     = 180 # Should match or exceed Lambda timeout
 }
 
 variable "retention_period" {
   type        = number
   description = "The number of seconds the queue retains a message"
-  default     = 345600  # 4 days
+  default     = 345600 # 4 days
 }
 
 variable "delay_seconds" {
@@ -31,7 +31,7 @@ variable "delay_seconds" {
 variable "max_message_size" {
   type        = number
   description = "The limit of how many bytes a message can contain"
-  default     = 262144  # 256 KiB
+  default     = 262144 # 256 KiB
 }
 
 variable "enable_dlq" {
@@ -49,7 +49,7 @@ variable "max_receive_count" {
 variable "dlq_retention_period" {
   type        = number
   description = "How long messages should be kept in the DLQ"
-  default     = 1209600  # 14 days
+  default     = 1209600 # 14 days
 }
 
 variable "source_arns" {
@@ -93,9 +93,9 @@ variable "tags" {
 variable "model_specific_config" {
   type = map(object({
     visibility_timeout = optional(number)
-    max_receive_count = optional(number)
-    delay_seconds    = optional(number)
-    policy_statements = optional(list(any))
+    max_receive_count  = optional(number)
+    delay_seconds      = optional(number)
+    policy_statements  = optional(list(any))
   }))
   description = "Model-specific configurations for each processing queue"
   default     = {}

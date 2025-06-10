@@ -10,7 +10,7 @@ resource "aws_secretsmanager_secret" "bastion_ssh_key" {
   name        = "${var.project_name}-${var.env}-bastion-key"
   description = "SSH private key for bastion host access"
   kms_key_id  = module.security.kms_key_arn
-  
+
   tags = merge(var.tags, {
     Environment = var.env
     Terraform   = "true"

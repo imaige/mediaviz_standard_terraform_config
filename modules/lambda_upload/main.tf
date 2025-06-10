@@ -26,6 +26,9 @@ resource "aws_lambda_function" "image_upload" {
   runtime       = var.lambda_runtime
   memory_size   = var.memory_size
   timeout       = var.timeout
+  layers        = ["arn:aws:lambda:us-east-2:515966522375:layer:PythonJose:1"] # Define it as it should be
+
+
 
   vpc_config {
     subnet_ids         = var.subnet_ids
@@ -34,25 +37,26 @@ resource "aws_lambda_function" "image_upload" {
 
   environment {
     variables = {
-      BUCKET_NAME        = var.s3_bucket_name
-      DB_SECRET_ARN     = var.aurora_secret_arn    # Add this
-      DB_CLUSTER_ARN    = var.aurora_cluster_arn   # Add this
-      DB_NAME           = var.aurora_database_name  # Add this
+      BUCKET_NAME    = var.s3_bucket_name
+      DB_SECRET_ARN  = var.aurora_secret_arn    # Add this
+      DB_CLUSTER_ARN = var.aurora_cluster_arn   # Add this
+      DB_NAME        = var.aurora_database_name # Add this
+      SECRET_KEY     = "cdc1dc3e9c0abec342fed61bec7c6c5e97d4ec484be37df8b8acce6a0286d127d16a44e55c73ddfe30d981c1ad36855d8b73c44a19076d51e7326f546dfa76f5"
     }
   }
 
   dead_letter_config {
     target_arn = aws_sqs_queue.lambda_dlq.arn
-  }  
+  }
 
   kms_key_arn = var.kms_key_arn
-#   code_signing_config_arn = aws_lambda_code_signing_config.signing_config.arn
+  #   code_signing_config_arn = aws_lambda_code_signing_config.signing_config.arn
 
   tracing_config {
     mode = "Active"
   }
 
-  reserved_concurrent_executions = null
+  reserved_concurrent_executions = 500
 
   tags = merge(local.normalized_tags, {
     environment = var.env
@@ -70,7 +74,7 @@ resource "aws_lambda_function_url" "image_upload" {
     allow_methods     = ["POST"]
     allow_headers     = ["*"]
     expose_headers    = ["*"]
-    max_age          = 3600
+    max_age           = 3600
   }
 }
 
@@ -109,7 +113,7 @@ resource "aws_lambda_code_signing_config" "signing_config" {
 }
 
 resource "aws_sqs_queue" "lambda_dlq" {
-  name = "${var.project_name}-${var.env}-lambda-dlq"
+  name              = "${var.project_name}-${var.env}-lambda-dlq"
   kms_master_key_id = var.kms_key_id
 
   tags = merge(local.normalized_tags, {
@@ -165,9 +169,9 @@ resource "aws_iam_role" "lambda_role" {
     ]
   })
 
-#   tags = merge( {
-#     environment = "dev-new1"
-#   })
+  #   tags = merge( {
+  #     environment = "dev-new1"
+  #   })
 }
 
 resource "aws_iam_role_policy" "lambda_rds_policy" {
@@ -285,7 +289,7 @@ resource "aws_iam_role_policy" "lambda_kms_policy" {
           "kms:Decrypt",
           "kms:DescribeKey"
         ]
-        Resource = var.aurora_kms_key_arn  # You'll need to pass this from your Aurora module
+        Resource = var.aurora_kms_key_arn # You'll need to pass this from your Aurora module
       }
     ]
   })

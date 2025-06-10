@@ -1,0 +1,214 @@
+# ArgoCD Helm values for MediaViz deployment
+
+global:
+  image:
+    tag: "v2.12.8"  # Latest stable version
+  
+crds:
+  install: true
+  keep: false
+
+# ArgoCD Server Configuration
+server:
+  name: server
+  
+  # Service account
+  serviceAccount:
+    create: false
+    name: ${server_service_account}
+    annotations:
+      eks.amazonaws.com/role-arn: ${server_service_account}
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Ingress configuration
+  ingress:
+    enabled: false
+    ingressClassName: "nginx"
+    hosts:
+      - ${argocd_domain}
+    tls:
+      - secretName: argocd-server-tls
+        hosts:
+          - ${argocd_domain}
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+    portName: http
+  
+  # Extra args for server
+  extraArgs:
+    - --insecure  # Disable TLS for internal communication
+  
+  # Configuration
+  config:
+    url: "https://${argocd_domain}"
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    
+    # OIDC configuration for GitHub SSO
+    %{ if enable_github_sso }
+    oidc.config: |
+      name: GitHub
+      issuer: https://api.github.com
+      clientId: ${github_client_id}
+      clientSecret: ${github_client_secret}
+      requestedScopes: ["user:email"]
+      requestedIDTokenClaims: {"groups": {"essential": true}}
+    %{ endif }
+    
+    # Repository configuration
+    repositories: |
+      - type: git
+        url: https://github.com/${github_org}/${github_repo}
+        name: ${project_name}-repo
+  
+  # RBAC configuration
+  rbacConfig:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, certificates, *, *, allow
+      p, role:admin, accounts, *, *, allow
+      p, role:admin, gpgkeys, *, *, allow
+      p, role:admin, logs, *, *, allow
+      p, role:admin, exec, *, *, allow
+      
+      # GitHub organization members get admin access
+      %{ if enable_github_sso }
+      g, ${github_org}:mediaviz-admins, role:admin
+      g, ${github_org}:mediaviz-developers, role:readonly
+      %{ endif }
+
+# ArgoCD Application Controller Configuration  
+controller:
+  name: application-controller
+  
+  # Service account
+  serviceAccount:
+    create: false
+    name: ${controller_service_account}
+    annotations:
+      eks.amazonaws.com/role-arn: ${controller_service_account}
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Enable if you have Prometheus operator
+  
+  # Environment variables for ECR access
+  env:
+    - name: AWS_REGION
+      value: "us-east-2"
+    - name: AWS_STS_REGIONAL_ENDPOINTS
+      value: "regional"
+
+# ArgoCD Repo Server Configuration
+repoServer:
+  name: repo-server
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Environment variables for ECR access
+  env:
+    - name: AWS_REGION
+      value: "us-east-2"
+    - name: AWS_STS_REGIONAL_ENDPOINTS
+      value: "regional"
+  
+  # Volume mounts for custom tools (if needed)
+  volumeMounts:
+    - name: custom-tools
+      mountPath: /usr/local/bin/argocd-vault-plugin
+      subPath: argocd-vault-plugin
+  
+  volumes:
+    - name: custom-tools
+      emptyDir: {}
+
+# ArgoCD Redis Configuration
+redis:
+  enabled: true
+  name: redis
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+# ArgoCD ApplicationSet Controller (optional)
+applicationSet:
+  enabled: true
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# ArgoCD Notifications Controller (optional)
+notifications:
+  enabled: false  # Enable for Slack/email notifications
+
+# ArgoCD CLI configuration
+cli:
+  enabled: false
+
+# Global configuration
+configs:
+  # Known hosts for Git repositories
+  ssh:
+    knownHosts: |
+      github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+      github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+
+  # TLS certificates
+  tls:
+    certificates: {}
+
+  # Initial admin password (bcrypt hash)
+  secret:
+    %{ if admin_password_hash != "" }
+    argocdServerAdminPassword: ${admin_password_hash}
+    %{ endif }
+    
+    # GitHub webhook secret (optional)
+    githubSecret: ""
+    
+    # GitLab webhook secret (optional)  
+    gitlabSecret: ""

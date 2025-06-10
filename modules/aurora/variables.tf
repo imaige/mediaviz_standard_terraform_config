@@ -87,7 +87,7 @@ variable "publicly_accessible" {
 variable "engine_version" {
   type        = string
   description = "Aurora PostgreSQL engine version"
-  default     = "16.3"  # Changed from 13.9
+  default     = "16.6" # Changed from 13.9
 }
 
 variable "eks_node_security_group_id" {

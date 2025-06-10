@@ -139,14 +139,14 @@ resource "aws_wafv2_web_acl" "api_waf" {
 # CloudWatch logging for WAF
 # CloudWatch logging for WAF
 resource "aws_cloudwatch_log_group" "waf_logs" {
-  name              = "aws-waf-logs-${var.project_name}-${var.env}"  # Changed format
+  name              = "aws-waf-logs-${var.project_name}-${var.env}" # Changed format
   retention_in_days = 365
 }
 
 # Enable WAF logging with kinesis_firehose_config
 resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
   log_destination_configs = [aws_cloudwatch_log_group.waf_logs.arn]
-  resource_arn           = aws_wafv2_web_acl.api_waf.arn
+  resource_arn            = aws_wafv2_web_acl.api_waf.arn
 
   logging_filter {
     default_behavior = "KEEP"

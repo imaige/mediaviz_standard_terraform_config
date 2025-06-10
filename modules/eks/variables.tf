@@ -16,7 +16,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.31"
+  default     = "1.32"
 }
 
 variable "vpc_id" {
@@ -141,7 +141,7 @@ variable "install_nvidia_plugin" {
 variable "nvidia_plugin_version" {
   description = "Version of the NVIDIA device plugin Helm chart"
   type        = string
-  default     = "0.17.0"
+  default     = "0.17.1"
 }
 
 variable "aurora_cluster_arns" {
@@ -190,4 +190,45 @@ variable "create_kubernetes_resources" {
   description = "Whether to create Kubernetes resources like service accounts and Helm charts"
   type        = bool
   default     = false
+}
+
+variable "additional_access_entries" {
+  description = "Additional IAM principals to grant access to the EKS cluster"
+  type = map(object({
+    kubernetes_groups = list(string)
+    principal_arn     = string
+    type              = string
+  }))
+  default = {}
+}
+
+variable "evidence_gpu_instance_types" {
+  description = "Instance types for the evidence model GPU node group"
+  type        = list(string)
+  default     = ["g5.4xlarge"]
+}
+
+variable "evidence_gpu_node_min_size" {
+  description = "Minimum size of the evidence GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "evidence_gpu_node_max_size" {
+  description = "Maximum size of the evidence GPU node group"
+  type        = number
+  default     = 5
+  
+}
+
+variable "evidence_gpu_node_desired_size" {
+  description = "Desired size of the evidence GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "nodegroup_version" {
+  description = "Version suffix for nodegroups to force recreation when subnets change"
+  type        = string
+  default     = "v2"
 }

@@ -44,7 +44,7 @@ variable "eks_managed_node_groups" {
 variable "cluster_version" {
   description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.31"
+  default     = "1.32"
 }
 
 variable "cluster_addons" {
@@ -62,7 +62,7 @@ variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
   default = {
-    environment = "dev"
+    environment = "qa"
     terraform   = "true"
     project     = "mediaviz"
   }
@@ -84,7 +84,7 @@ variable "node_group_max_size" {
 variable "node_group_desired_size" {
   description = "Desired size of the EKS node group"
   type        = number
-  default     = 3
+  default     = 6
 }
 
 variable "cors_allowed_origins" {
@@ -155,16 +155,6 @@ variable "project_name" {
   default     = "mediaviz-serverless" # This differentiates it from your EKS resources
 }
 
-# variable "encrypted_env_var" {
-#   description = "Encrypted environment variable for Lambda function"
-#   type        = string
-# }
-
-variable "shared_account_id" {
-  description = "AWS account ID for shared services"
-  type        = string
-}
-
 variable "github_org" {
   description = "GitHub organization name"
   type        = string
@@ -175,8 +165,80 @@ variable "github_repo" {
   type        = string
 }
 
-variable "shared_role_arn" {
-  description = "ARN of the role in the shared account to assume"
-  type        = string
-  default     = ""
+variable "shared_ecr_repositories" {
+  description = "List of ECR repository names to access in the shared account"
+  type        = list(string)
+  default = [
+    "l-blur-model",
+    "l-colors-model",
+    "l-image-comparison-model",
+    "l-facial-recognition-model",
+    "eks-feature-extraction-model",
+    "eks-image-classification-model",
+    "eks-evidence-model"
+  ]
 }
+
+variable "gpu_instance_types" {
+  description = "Instance types for the GPU node group"
+  type        = list(string)
+  default     = ["g4dn.xlarge"]
+}
+
+variable "gpu_node_min_size" {
+  description = "Minimum size of the GPU node group"
+  type        = number
+  default     = 0
+}
+
+variable "gpu_node_max_size" {
+  description = "Maximum size of the GPU node group"
+  type        = number
+  default     = 8
+}
+
+variable "gpu_node_desired_size" {
+  description = "Desired size of the GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "bastion_allowed_ips" {
+  description = "List of IPs allowed to connect to the bastion host"
+  type        = list(string)
+  default = [
+    "24.5.226.154/32",
+    "73.169.81.101/32",
+    "67.241.163.178/32",
+    "76.155.77.153/32",
+    "136.29.106.130/32",
+    "67.162.158.188/32",
+    "136.36.145.192/32",
+    "135.129.132.20/32"
+  ]
+}
+
+variable "evidence_gpu_instance_types" {
+  description = "Instance types for the evidence model GPU node group"
+  type        = list(string)
+  default     = ["g5.4xlarge"]
+}
+
+variable "evidence_gpu_node_min_size" {
+  description = "Minimum size of the evidence GPU node group"
+  type        = number
+  default     = 0
+}
+
+variable "evidence_gpu_node_max_size" {
+  description = "Maximum size of the evidence GPU node group"
+  type        = number
+  default     = 3
+}
+
+variable "evidence_gpu_node_desired_size" {
+  description = "Desired size of the evidence GPU node group"
+  type        = number
+  default     = 1
+}
+

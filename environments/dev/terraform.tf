@@ -18,7 +18,7 @@ terraform {
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.17.0"  # Updated version
+      version = "~> 2.17.0" # Updated version
     }
     time = {
       source  = "hashicorp/time"
@@ -29,7 +29,8 @@ terraform {
 
 # Provider configurations
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = "ima"
 
   # default_tags {
   #   tags = {
@@ -52,11 +53,11 @@ provider "kubernetes" {
   }
 }
 
-provider "helm" {                         # Add this provider
+provider "helm" { # Add this provider
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-    
+
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"

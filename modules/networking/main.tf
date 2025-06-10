@@ -6,7 +6,7 @@ module "vpc" {
 
   azs             = data.aws_availability_zones.available.names
   public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"]
-  private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
+  private_subnets = ["192.168.16.0/22", "192.168.20.0/22", "192.168.24.0/22", "192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
 
   enable_nat_gateway   = true
   single_nat_gateway   = true
@@ -18,10 +18,10 @@ module "vpc" {
   create_flow_log_cloudwatch_log_group = true
   create_flow_log_cloudwatch_iam_role  = true
   flow_log_max_aggregation_interval    = 60
-  
+
   # Enable Network ACLs
   manage_default_network_acl = true
-  default_network_acl_tags   = {
+  default_network_acl_tags = {
     Name = "${var.cluster_name}-${var.env}-default"
   }
 

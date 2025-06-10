@@ -12,11 +12,11 @@ locals {
       terraform   = "true"
     }
   )
-  
+
   # Use bucket_suffix if provided, otherwise use default names
-  primary_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}" : "${var.project_name}-${var.env}-uploads"
-  logs_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-logs" : "${var.project_name}-${var.env}-uploads-logs"
-  processed_bucket_name = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-processed" : "${var.project_name}-${var.env}-processed"
+  primary_bucket_name     = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}" : "${var.project_name}-${var.env}-uploads"
+  logs_bucket_name        = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-logs" : "${var.project_name}-${var.env}-uploads-logs"
+  processed_bucket_name   = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-processed" : "${var.project_name}-${var.env}-processed"
   helm_charts_bucket_name = var.helm_charts_bucket_name != "" ? var.helm_charts_bucket_name : "${var.project_name}-${var.env}-helm-charts"
 }
 
@@ -25,7 +25,7 @@ locals {
 #-------------------------------------------------
 resource "aws_s3_bucket" "primary" {
   bucket = local.primary_bucket_name
-  
+
   tags = local.normalized_tags
 }
 
@@ -75,7 +75,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
   rule {
     id     = "expiration-rule"
     status = "Enabled"
-    
+
     # Add a filter block to comply with AWS provider requirements
     filter {
       prefix = "" # Empty prefix applies to all objects
@@ -85,13 +85,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
     expiration {
       days = max(var.retention_days, 91)
     }
-    
+
     # Storage class transitions
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
     }
-    
+
     transition {
       days          = 90
       storage_class = "GLACIER"
@@ -100,7 +100,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
 }
 
 resource "aws_s3_bucket_notification" "primary" {
-  bucket = aws_s3_bucket.primary.id
+  bucket      = aws_s3_bucket.primary.id
   eventbridge = true
 }
 
@@ -109,7 +109,7 @@ resource "aws_s3_bucket_notification" "primary" {
 #-------------------------------------------------
 resource "aws_s3_bucket" "logs" {
   bucket = local.logs_bucket_name
-  
+
   tags = local.normalized_tags
 }
 
@@ -121,7 +121,7 @@ resource "aws_s3_bucket_versioning" "logs" {
 }
 
 resource "aws_s3_bucket_notification" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  bucket      = aws_s3_bucket.logs.id
   eventbridge = true
 }
 
@@ -136,7 +136,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
 }
 
 resource "aws_s3_bucket_public_access_block" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  bucket                  = aws_s3_bucket.logs.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -150,7 +150,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "cleanup"
     status = "Enabled"
     filter {
-      prefix = ""  # Empty prefix applies to all objects
+      prefix = "" # Empty prefix applies to all objects
     }
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -175,7 +175,7 @@ resource "aws_s3_bucket_logging" "primary" {
 #-------------------------------------------------
 resource "aws_s3_bucket" "processed" {
   bucket = local.processed_bucket_name
-  
+
   tags = local.normalized_tags
 }
 
@@ -187,7 +187,7 @@ resource "aws_s3_bucket_versioning" "processed" {
 }
 
 resource "aws_s3_bucket_public_access_block" "processed" {
-  bucket = aws_s3_bucket.processed.id
+  bucket                  = aws_s3_bucket.processed.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -225,7 +225,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed" {
     status = "Enabled"
 
     filter {
-      prefix = ""  # Empty prefix applies to all objects
+      prefix = "" # Empty prefix applies to all objects
     }
 
     abort_incomplete_multipart_upload {
@@ -247,7 +247,7 @@ resource "aws_s3_bucket_logging" "processed" {
 }
 
 resource "aws_s3_bucket_notification" "processed" {
-  bucket = aws_s3_bucket.processed.id
+  bucket      = aws_s3_bucket.processed.id
   eventbridge = true
 }
 
@@ -256,7 +256,7 @@ resource "aws_s3_bucket_notification" "processed" {
 #-------------------------------------------------
 resource "aws_s3_bucket" "helm_charts" {
   bucket = local.helm_charts_bucket_name
-  
+
   tags = local.normalized_tags
 }
 
@@ -293,7 +293,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
 
   rule {
     filter {
-      prefix = ""  # Empty prefix applies to all objects
+      prefix = "" # Empty prefix applies to all objects
     }
     id     = "cleanup"
     status = "Enabled"
@@ -304,7 +304,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "helm_charts" {
 
     # Optional: Add expiration if you want to clean up old chart versions
     expiration {
-      days = 365  # Adjust retention period as needed
+      days = 365 # Adjust retention period as needed
     }
   }
 }
@@ -317,7 +317,7 @@ resource "aws_s3_bucket_logging" "helm_charts" {
 }
 
 resource "aws_s3_bucket_notification" "helm_charts" {
-  bucket = aws_s3_bucket.helm_charts.id
+  bucket      = aws_s3_bucket.helm_charts.id
   eventbridge = true
 }
 
@@ -332,7 +332,7 @@ resource "aws_s3_bucket_policy" "helm_charts" {
       {
         Effect = "Allow",
         Principal = {
-          AWS = "arn:aws:iam::515966522375:root"  # Use a known valid ARN
+          AWS = "arn:aws:iam::515966522375:root" # Use a known valid ARN
         },
         Action = [
           "s3:GetObject",

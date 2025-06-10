@@ -6,8 +6,8 @@ data "aws_region" "current" {}
 resource "aws_kms_key" "encryption" {
   description             = "${var.project_name}-${var.env}-encryption-key"
   deletion_window_in_days = 7
-  enable_key_rotation    = true
-  multi_region           = true
+  enable_key_rotation     = true
+  multi_region            = true
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -38,7 +38,7 @@ resource "aws_kms_key" "encryption" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "kms:ViaService": [
+            "kms:ViaService" : [
               "rds.${data.aws_region.current.name}.amazonaws.com",
               "secretsmanager.${data.aws_region.current.name}.amazonaws.com",
               "ec2.${data.aws_region.current.name}.amazonaws.com",
@@ -46,7 +46,7 @@ resource "aws_kms_key" "encryption" {
             ]
           },
           StringLike = {
-            "aws:PrincipalArn": [
+            "aws:PrincipalArn" : [
               "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/*"
             ]
           }
@@ -68,7 +68,7 @@ resource "aws_kms_key" "encryption" {
         Resource = "*"
         Condition = {
           ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*"
+            "kms:EncryptionContext:aws:logs:arn" : "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*"
           }
         }
       }
