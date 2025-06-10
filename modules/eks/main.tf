@@ -265,6 +265,74 @@ module "eks" {
         ManagedBy    = "terraform"
       })
     }
+
+    # New on-demand GPU node group for mixed workload deployment (3 nodes for 3 models)
+    "gpu_ondemand-${var.nodegroup_version}" = {
+      ami_type       = "AL2023_x86_64_NVIDIA"
+      instance_types = ["g4dn.xlarge"]
+      capacity_type  = "ON_DEMAND"
+
+      min_size     = 3
+      max_size     = 3
+      desired_size = 3
+
+      enable_monitoring = true
+      ebs_optimized     = true
+
+      # Configure update behavior
+      update_config = {
+        max_unavailable_percentage = 25
+      }
+
+      # Add IAM policies
+      iam_role_additional_policies = {
+        secrets_policy = aws_iam_policy.node_secrets_policy.arn,
+        ssm_policy     = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }
+
+      # Kubernetes labels for node selection
+      labels = {
+        "nvidia.com/gpu.present"           = "true"
+        "nvidia.com/gpu.product"           = "Tesla-T4"
+        "node-type"                        = "gpu-ondemand"
+        "app-type"                         = "ml-application"
+        "capacity-type"                    = "on-demand"
+      }
+
+      # Taints to ensure only GPU workloads run on these nodes
+      taints = {
+        dedicated = {
+          key    = "nvidia.com/gpu"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
+
+      # Block device mappings with adequate storage for ML workloads
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 200
+            volume_type           = "gp3"
+            iops                  = 4000
+            throughput            = 200
+            encrypted             = true
+            kms_key_id            = var.kms_key_arn
+            delete_on_termination = true
+          }
+        }
+      }
+
+      # Comprehensive tagging
+      tags = merge(var.tags, {
+        Name        = "${var.project_name}-${var.env}-gpu-ondemand-node"
+        NodeGroup   = "gpu-ondemand"
+        GpuType     = "nvidia-t4"
+        Environment = var.env
+        ManagedBy   = "terraform"
+      })
+    }
   }
 
   # Enable logging for audit and troubleshooting

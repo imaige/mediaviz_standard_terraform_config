@@ -147,6 +147,12 @@ variable "memory_limit" {
   default     = "512Mi"
 }
 
+variable "use_ondemand_nodes" {
+  description = "Whether to target on-demand GPU nodes instead of spot nodes"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)

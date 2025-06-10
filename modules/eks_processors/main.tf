@@ -380,6 +380,31 @@ resource "helm_release" "model_deployments" {
     value = var.memory_request
   }
 
+  # GPU tolerations for GPU models
+  dynamic "set" {
+    for_each = contains(["feature-extraction-model", "image-classification-model", "similarity-model", "evidence-model"], each.key) ? [1] : []
+    content {
+      name  = "tolerations[0].key"
+      value = "nvidia.com/gpu"
+    }
+  }
+
+  dynamic "set" {
+    for_each = contains(["feature-extraction-model", "image-classification-model", "similarity-model", "evidence-model"], each.key) ? [1] : []
+    content {
+      name  = "tolerations[0].value"
+      value = "true"
+    }
+  }
+
+  dynamic "set" {
+    for_each = contains(["feature-extraction-model", "image-classification-model", "similarity-model", "evidence-model"], each.key) ? [1] : []
+    content {
+      name  = "tolerations[0].effect"
+      value = "NoSchedule"
+    }
+  }
+
   # Node selector for evidence model
   dynamic "set" {
     for_each = lookup(each.value, "dedicated_nodes", false) ? [1] : []
@@ -394,6 +419,31 @@ resource "helm_release" "model_deployments" {
     content {
       name  = "nodeSelector.workload-type"
       value = "evidence-model"
+    }
+  }
+
+  # Node affinity for on-demand nodes (when use_ondemand_nodes is true)
+  dynamic "set" {
+    for_each = var.use_ondemand_nodes ? [1] : []
+    content {
+      name  = "affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key"
+      value = "node-type"
+    }
+  }
+
+  dynamic "set" {
+    for_each = var.use_ondemand_nodes ? [1] : []
+    content {
+      name  = "affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator"
+      value = "In"
+    }
+  }
+
+  dynamic "set" {
+    for_each = var.use_ondemand_nodes ? [1] : []
+    content {
+      name  = "affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]"
+      value = "gpu-ondemand"
     }
   }
 

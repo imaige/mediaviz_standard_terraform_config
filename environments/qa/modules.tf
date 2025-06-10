@@ -339,10 +339,10 @@ module "eks_processors" {
   replicas       = 1
   model_replicas = {
     "evidence-model"             = 3
-    "image-classification-model" = 5
-    "feature-extraction-model"   = 1
+    "image-classification-model" = 4  # 4 on spot + 1 on on-demand = 5 total
+    "feature-extraction-model"   = 0  # 0 on spot + 1 on on-demand = 1 total  
     "external-api"               = 1
-    "similarity-model"           = 1
+    "similarity-model"           = 0  # 0 on spot + 1 on on-demand = 1 total
     "similarity-set-sorting-service" = 1
     "personhood-model"           = 1
   }
@@ -353,6 +353,68 @@ module "eks_processors" {
 
   tags = var.tags
 }
+
+# On-demand GPU deployments for specific models (1 replica each)
+module "eks_processors_ondemand" {
+  source = "./../../modules/eks_processors"
+
+  project_name = var.project_name
+  env          = var.env
+  aws_region   = data.aws_region.current.name
+
+  # Shared services configuration
+  shared_account_id = data.terraform_remote_state.shared.outputs.account_id
+  shared_role_arn   = data.terraform_remote_state.shared.outputs.cross_account_role_arn
+
+  # Disable shared role assumption temporarily until we resolve the errors
+  enable_shared_role_assumption = false
+
+  # Aurora configurations
+  aurora_cluster_arn   = module.aurora.cluster_arn
+  aurora_secret_arn    = module.aurora.secret_arn
+  aurora_database_name = module.aurora.database_name
+
+  # Kubernetes namespace
+  namespace = "default"
+
+  # SQS configuration
+  sqs_queues = {
+    "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
+    "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
+  }
+
+  # Security and identity
+  kms_key_arn       = module.security.kms_key_arn
+  oidc_provider     = module.eks.oidc_provider
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  # S3 bucket access
+  s3_bucket_arns = [
+    local.s3_helm_charts_bucket_arn,
+    "${local.s3_helm_charts_bucket_arn}/*"
+  ]
+
+  # Enable helm deployments for on-demand models only
+  enable_helm_deployments = true
+
+  # Resource settings - only deploy the 3 models on on-demand nodes (1 replica each)
+  replicas       = 1
+  model_replicas = {
+    "feature-extraction-model"   = 1
+    "image-classification-model" = 1
+    "similarity-model"           = 1
+  }
+  cpu_request    = "100m"
+  memory_request = "128Mi"
+  cpu_limit      = "500m"
+  memory_limit   = "512Mi"
+
+  # Target on-demand GPU nodes
+  use_ondemand_nodes = true
+
+  tags = var.tags
+}
+
 module "cross_account_roles" {
   source = "../../modules/cross-account-roles"
 
