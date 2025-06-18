@@ -188,19 +188,19 @@ variable "gpu_instance_types" {
 variable "gpu_node_min_size" {
   description = "Minimum size of the GPU node group"
   type        = number
-  default     = 16
+  default     = 13
 }
 
 variable "gpu_node_max_size" {
   description = "Maximum size of the GPU node group"
   type        = number
-  default     = 20
+  default     = 17
 }
 
 variable "gpu_node_desired_size" {
   description = "Desired size of the GPU node group"
   type        = number
-  default     = 16
+  default     = 13
 }
 
 variable "bastion_allowed_ips" {
