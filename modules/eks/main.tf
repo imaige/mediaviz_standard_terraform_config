@@ -269,12 +269,12 @@ module "eks" {
     # New on-demand GPU node group for mixed workload deployment (3 nodes for 3 models)
     "gpu_ondemand-${var.nodegroup_version}" = {
       ami_type       = "AL2023_x86_64_NVIDIA"
-      instance_types = ["g4dn.xlarge"]
+      instance_types = var.gpu_ondemand_instance_types
       capacity_type  = "ON_DEMAND"
 
-      min_size     = 3
-      max_size     = 3
-      desired_size = 3
+      min_size     = var.gpu_ondemand_node_min_size
+      max_size     = var.gpu_ondemand_node_max_size
+      desired_size = var.gpu_ondemand_node_desired_size
 
       enable_monitoring = true
       ebs_optimized     = true
