@@ -45,10 +45,10 @@ module "eks" {
   gpu_node_desired_size = var.gpu_node_desired_size
 
   # Use GPU On Demand instance types variable
-  gpu_ondemand_instance_types    = var.gpu_ondemand_instance_types
+  gpu_ondemand_instance_types    = var.gpu_instance_types
   gpu_ondemand_node_min_size     = var.gpu_ondemand_node_min_size
   gpu_ondemand_node_max_size     = var.gpu_ondemand_node_max_size
-  gpu_ondemand_node_desired_size = var.gpu_nondemand_ode_desired_size
+  gpu_ondemand_node_desired_size = var.gpu_ondemand_node_desired_size
 
   # Evidence model dedicated GPU nodes
   evidence_gpu_instance_types    = var.evidence_gpu_instance_types

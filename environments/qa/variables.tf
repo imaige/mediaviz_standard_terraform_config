@@ -203,19 +203,19 @@ variable "gpu_node_desired_size" {
   default     = 13
 }
 
-variable "gpu_node_ondemand_min_size" {
+variable "gpu_ondemand_node_min_size" {
   description = "Minimum size of the GPU ondemand node group"
   type        = number
   default     = 3
 }
 
-variable "gpu_node_ondemand_max_size" {
+variable "gpu_ondemand_node_max_size" {
   description = "Maximum size of the GPU ondemand node group"
   type        = number
   default     = 3
 }
 
-variable "gpu_node_ondemand_desired_size" {
+variable "gpu_ondemand_node_desired_size" {
   description = "Desired size of the GPU node ondemand group"
   type        = number
   default     = 3

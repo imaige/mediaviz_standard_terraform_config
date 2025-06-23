@@ -126,6 +126,30 @@ variable "gpu_node_desired_size" {
   default     = 0
 }
 
+variable "gpu_ondemand_instance_types" {
+  description = "Instance types for the GPU node group"
+  type        = list(string)
+  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
+}
+
+variable "gpu_ondemand_node_min_size" {
+  description = "Minimum size of the GPU node group"
+  type        = number
+  default     = 0
+}
+
+variable "gpu_ondemand_node_max_size" {
+  description = "Maximum size of the GPU node group"
+  type        = number
+  default     = 10
+}
+
+variable "gpu_ondemand_node_desired_size" {
+  description = "Desired size of the GPU node group"
+  type        = number
+  default     = 0
+}
+
 variable "enable_fargate" {
   description = "Whether to enable Fargate profiles for the cluster"
   type        = bool
@@ -218,7 +242,7 @@ variable "evidence_gpu_node_max_size" {
   description = "Maximum size of the evidence GPU node group"
   type        = number
   default     = 5
-  
+
 }
 
 variable "evidence_gpu_node_desired_size" {
