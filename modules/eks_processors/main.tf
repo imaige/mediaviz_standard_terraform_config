@@ -144,7 +144,8 @@ resource "aws_iam_role_policy" "model_policies" {
             "sqs:ChangeMessageVisibility"
           ]
           Resource = [
-            "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${split("/", lookup(var.sqs_queues, each.key, ""))[4]}"
+            "*"
+            #"arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${split("/", lookup(var.sqs_queues, each.key, ""))[4]}"
           ]
         }
       ] : [],
