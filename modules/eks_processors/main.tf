@@ -12,13 +12,13 @@ locals {
     }
     "external-api" = {
       short_name = "external-api-model"
-      needs_sqs  = false
       needs_helm = true
+      needs_sqs  = true
     }
     "evidence-model" = {
       short_name      = "evidence-model"
-      needs_sqs       = false
       needs_helm      = true
+      needs_sqs       = true
       dedicated_nodes = true
       node_selector = {
         "node-type"     = "high-power-gpu"
@@ -35,18 +35,18 @@ locals {
     }
     "similarity-model" = {
       short_name = "similarity-model"
-      needs_sqs  = false
       needs_helm = true
+      needs_sqs  = true
     }
     "similarity-set-sorting-service" = {
       short_name = "similarity-set-sorting-service"
-      needs_sqs  = false
       needs_helm = true
+      needs_sqs  = true
     }
     "personhood-model" = {
       short_name = "personhood-model"
-      needs_sqs  = false
       needs_helm = true
+      needs_sqs  = true
     }
   }
 

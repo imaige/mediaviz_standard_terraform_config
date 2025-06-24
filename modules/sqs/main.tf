@@ -2,7 +2,7 @@
 
 locals {
   lambda_models = ["lambda-blur-model", "lambda-colors-model", "lambda-image-comparison-model", "lambda-facial-recognition-model"]
-  eks_models    = ["eks-image-classification-model", "eks-feature-extraction-model", "eks-evidence-model", "eks-similarity-model", "eks-personhood-model"]
+  eks_models    = ["eks-image-classification-model", "eks-feature-extraction-model", "eks-evidence-model", "eks-similarity-model", "eks-personhood-model", "eks-similarity-set-sorting-service", "eks-external-api"]
   all_models    = concat(local.lambda_models, local.eks_models)
 
   # Normalize tags to lowercase to prevent case-sensitivity issues
