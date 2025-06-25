@@ -317,8 +317,13 @@ module "eks_processors" {
 
   # SQS configuration
   sqs_queues = {
-    "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
-    "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
+    "feature-extraction-model"       = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
+    "image-classification-model"     = module.sqs.eks_queue_urls["eks-image-classification-model"]
+    "similarity-set-sorting-service" = module.sqs.eks_queue_urls["eks-similarity-set-sorting-service"]
+    "similarity-model"               = module.sqs.eks_queue_urls["eks-similarity-model"]
+    "evidence-model"                 = module.sqs.eks_queue_urls["eks-evidence-model"]
+    "personhood-model"               = module.sqs.eks_queue_urls["eks-personhood-model"]
+    "external-api"                   = module.sqs.eks_queue_urls["eks-external-api"]
   }
 
   # Security and identity
@@ -381,6 +386,10 @@ module "eks_processors_ondemand" {
   sqs_queues = {
     "feature-extraction-model"   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
     "image-classification-model" = module.sqs.eks_queue_urls["eks-image-classification-model"]
+    # "similarity-set-sorting-service" = module.sqs.eks_queue_urls["eks-similarity-set-sorting-service"]
+    # "similarity-model"               = module.sqs.eks_queue_urls["eks-similarity-model"]
+    # "evidence-model"                 = module.sqs.eks_queue_urls["eks-evidence-model"]
+    # "personhood-model"               = module.sqs.eks_queue_urls["eks-personhood-model"]
   }
 
   # Security and identity
