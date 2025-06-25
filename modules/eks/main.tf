@@ -368,7 +368,7 @@ module "eks" {
   })
 }
 
-/*module "karpenter" {
+module "karpenter" {
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"
   version = "~> 20.0"
 
@@ -379,7 +379,42 @@ module "eks" {
   tags = {
     "karpenter.sh/discovery" = module.eks.cluster_name
   }
-}*/
+}
+
+resource "helm_release" "karpenter" {
+  namespace        = "karpenter"
+  create_namespace = true
+  name             = "karpenter"
+  # This chart is v1.5.1
+  chart = "${path.module}/chart/karpenter"
+  wait  = true
+
+  # Values passed to the Helm chart
+  set {
+    # Link the kubernetes service account to the IAM role
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = module.karpenter.iam_role_arn # Value from the module output
+  }
+
+  set {
+    # The cluster being managed
+    name  = "settings.aws.clusterName"
+    value = module.eks.cluster_name # Value from the EKS module output
+  }
+
+  set {
+    # The default instance profile
+    name  = "settings.aws.defaultInstanceProfile"
+    value = module.karpenter.instance_profile_name
+  }
+
+  set {
+    # Native Spot instance interrupt handling
+    name  = "settings.aws.interruptionQueueName"
+    value = module.karpenter.queue_name
+  }
+}
+
 
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {
