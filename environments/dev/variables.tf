@@ -152,17 +152,19 @@ variable "eventbridge_rule_description" {
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "mediaviz-serverless" # This differentiates it from your EKS resources
+  default     = "mediaviz" # This differentiates it from your EKS resources
 }
 
 variable "github_org" {
   description = "GitHub organization name"
   type        = string
+  default     = "imaige"
 }
 
 variable "github_repo" {
   description = "GitHub repository name"
   type        = string
+  default     = ""
 }
 
 variable "shared_ecr_repositories" {
