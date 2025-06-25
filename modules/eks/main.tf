@@ -159,10 +159,10 @@ module "eks" {
 
       # Kubernetes labels for node selection
       labels = {
-        "nvidia.com/gpu.present"           = "true"
-        "nvidia.com/gpu.product"           = "Tesla-T4"
-        "node-type"                        = "gpu"
-        "app-type"                         = "ml-application"
+        "nvidia.com/gpu.present" = "true"
+        "nvidia.com/gpu.product" = "Tesla-T4"
+        "node-type"              = "gpu"
+        "app-type"               = "ml-application"
       }
 
       # Taints to ensure only GPU workloads run on these nodes
@@ -226,9 +226,9 @@ module "eks" {
 
       # Kubernetes labels for node selection
       labels = {
-        "nvidia.com/gpu.present"           = "true"
-        "nvidia.com/gpu.product"           = "A10G"
-        "node-type"                        = "high-power-gpu"
+        "nvidia.com/gpu.present" = "true"
+        "nvidia.com/gpu.product" = "A10G"
+        "node-type"              = "high-power-gpu"
       }
 
       taints = {
@@ -292,11 +292,11 @@ module "eks" {
 
       # Kubernetes labels for node selection
       labels = {
-        "nvidia.com/gpu.present"           = "true"
-        "nvidia.com/gpu.product"           = "Tesla-T4"
-        "node-type"                        = "gpu-ondemand"
-        "app-type"                         = "ml-application"
-        "capacity-type"                    = "on-demand"
+        "nvidia.com/gpu.present" = "true"
+        "nvidia.com/gpu.product" = "Tesla-T4"
+        "node-type"              = "gpu-ondemand"
+        "app-type"               = "ml-application"
+        "capacity-type"          = "on-demand"
       }
 
       # Taints to ensure only GPU workloads run on these nodes
@@ -367,6 +367,19 @@ module "eks" {
     Project     = var.project_name
   })
 }
+
+/*module "karpenter" {
+  source  = "terraform-aws-modules/eks/aws//modules/karpenter"
+  version = "~> 20.0"
+
+  cluster_name = module.eks.cluster_name
+
+  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
+
+  tags = {
+    "karpenter.sh/discovery" = module.eks.cluster_name
+  }
+}*/
 
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {

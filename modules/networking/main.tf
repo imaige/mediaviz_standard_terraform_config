@@ -25,10 +25,7 @@ module "vpc" {
     Name = "${var.cluster_name}-${var.env}-default"
   }
 
-  tags = {
-    Terraform   = "true"
-    Environment = var.env
-  }
+  tags = var.tags
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = "1"
