@@ -221,7 +221,7 @@ module "sqs" {
   # Base configuration
   visibility_timeout = 300 # 5 minutes
   enable_dlq         = true
-  max_receive_count  = 3
+  max_receive_count  = 30
 
   # Source ARNs
   source_arns = concat(
