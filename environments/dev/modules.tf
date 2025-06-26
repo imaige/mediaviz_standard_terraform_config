@@ -4,6 +4,7 @@ module "vpc" {
 
   cluster_name = var.cluster_name
   env          = var.env
+  tags         = var.tags
 }
 
 module "security" {
@@ -262,9 +263,9 @@ module "aurora" {
   publicly_accessible        = true
   eks_node_security_group_id = module.eks.node_security_group_id
 
-  instance_count = 1 # Single instance for dev
+  instance_count = 1   # Single instance for dev
   min_capacity   = 0.5 # Start lower for dev
-  max_capacity   = 16 # Much lower ceiling for dev
+  max_capacity   = 16  # Much lower ceiling for dev
 
   tags = var.tags
 }
@@ -333,15 +334,15 @@ module "eks_processors" {
   enable_helm_deployments = true
 
   # Resource settings
-  replicas       = 1
+  replicas = 1
   model_replicas = {
-    "evidence-model"             = 1
-    "image-classification-model" = 2
-    "feature-extraction-model"   = 1
-    "external-api"               = 1
-    "similarity-model"           = 1
+    "evidence-model"                 = 1
+    "image-classification-model"     = 2
+    "feature-extraction-model"       = 1
+    "external-api"                   = 1
+    "similarity-model"               = 1
     "similarity-set-sorting-service" = 1
-    "personhood-model"           = 1
+    "personhood-model"               = 1
   }
   cpu_request    = "100m"
   memory_request = "128Mi"

@@ -64,7 +64,7 @@ variable "tags" {
   default = {
     environment = "qa"
     terraform   = "true"
-    project     = "mediaviz"
+    project     = "mediaviz-serverless"
   }
 }
 
