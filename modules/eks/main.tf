@@ -398,7 +398,7 @@ resource "helm_release" "karpenter" {
 
   set {
     # The cluster being managed
-    name  = "settings.aws.clusterName"
+    name  = "settings.clusterName"
     value = module.eks.cluster_name # Value from the EKS module output
   }
 
@@ -410,11 +410,43 @@ resource "helm_release" "karpenter" {
 
   set {
     # Native Spot instance interrupt handling
-    name  = "settings.aws.interruptionQueueName"
+    name  = "settings.interruptionQueue"
     value = module.karpenter.queue_name
   }
 }
 
+/*
+module "helm_release" "keda" {
+  namespace        = "keda"
+  create_namespace = true
+  name             = "keda"
+  # This chart is v2.17.2
+  chart = "${path.module}/chart/keda"
+  wait  = true
+
+  set {
+    # The cluster name
+    name  = "ClusterName"
+    value = module.eks.cluster_name
+  }
+
+  set {
+    # Enable IRSA
+    name  = "podIdentity.aws.irsa.enabled"
+    value = true
+  }
+  set {
+    # IRSA RoleArn
+    name  = "podIdentity.aws.irsa.roleArn"
+    value = module.eks.oidc_provider_arn
+  }
+  set {
+    # logging
+    name  = "logging.operator.format"
+    value = "json"
+  }
+}
+*/
 
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {
