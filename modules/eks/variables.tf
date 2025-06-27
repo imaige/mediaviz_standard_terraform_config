@@ -244,7 +244,7 @@ variable "evidence_gpu_nodepool_capacity_type" {
   type        = list(string)
   default     = ["on-demand"]
   validation {
-    condition     = contains(["on-demand", "spot"], var.evidence_gpu_node_capacity_type)
+    condition     = contains(["on-demand", "spot"], var.evidence_gpu_nodepool_capacity_type)
     error_message = "Valid capacity-types are: (on-demand, spot)"
   }
 }
