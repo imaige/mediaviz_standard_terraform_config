@@ -50,11 +50,25 @@ resource "aws_grafana_workspace" "main" {
 
 # Grafana Data Source for Prometheus
 resource "aws_grafana_workspace_api_key" "prometheus_access" {
-  count                = var.create_prometheus_datasource ? 1 : 0
-  key_name             = "prometheus-access"
-  key_role             = "ADMIN"
-  seconds_to_live      = var.api_key_seconds_to_live
-  workspace_id         = aws_grafana_workspace.main.id
+  count           = var.create_prometheus_datasource ? 1 : 0
+  key_name        = "prometheus-access"
+  key_role        = "ADMIN"
+  seconds_to_live = var.api_key_seconds_to_live
+  workspace_id    = aws_grafana_workspace.main.id
+}
+
+# Configure Prometheus as the default data source
+
+resource "grafana_data_source" "prometheus" {
+  type       = "prometheus"
+  name       = "Prometheus (AMP)"
+  url        = aws_prometheus_workspace.main.prometheus_endpoint
+  is_default = true
+  json_data_encoded = jsonencode({
+    sigV4Auth     = true
+    sigV4AuthType = "workspace-iam-role"
+    sigV4Region   = aws_prometheus_workspace.main.arn.region
+  })
 }
 
 # IAM Role for Grafana to access Prometheus and CloudWatch
