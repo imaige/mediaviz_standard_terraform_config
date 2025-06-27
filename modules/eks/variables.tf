@@ -19,6 +19,12 @@ variable "cluster_version" {
   default     = "1.32"
 }
 
+variable "namespace" {
+  description = "Kubernetes namespace for deployments"
+  type        = string
+  default     = "default"
+}
+
 variable "vpc_id" {
   description = "ID of the VPC where the cluster will be created"
   type        = string
@@ -218,7 +224,7 @@ variable "evidence_gpu_node_max_size" {
   description = "Maximum size of the evidence GPU node group"
   type        = number
   default     = 5
-  
+
 }
 
 variable "evidence_gpu_node_desired_size" {
@@ -231,4 +237,26 @@ variable "nodegroup_version" {
   description = "Version suffix for nodegroups to force recreation when subnets change"
   type        = string
   default     = "v2"
+}
+
+variable "evidence_gpu_nodepool_capacity_type" {
+  description = "Capacity type for the evidence GPU node group"
+  type        = list(string)
+  default     = ["on-demand"]
+  validation {
+    condition     = contains(["on-demand", "spot"], var.evidence_gpu_node_capacity_type)
+    error_message = "Valid capacity-types are: (on-demand, spot)"
+  }
+}
+
+variable "evidence_gpu_nodepool_max_cpu" {
+  description = "Maximum CPU limit for evidence nodes"
+  type        = number
+  default     = 64
+}
+
+variable "evidence_gpu_nodepool_max_mem" {
+  description = "Maximum memory limit for evidence nodes"
+  type        = string
+  default     = "256Gi"
 }
