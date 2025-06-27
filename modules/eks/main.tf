@@ -16,6 +16,9 @@ module "eks" {
   cluster_endpoint_private_access = true
   enable_irsa                     = true
 
+  # enable Karpenter
+  enable_karpenter = true
+
   # Authentication configuration
   authentication_mode = "API"
 
@@ -366,19 +369,6 @@ module "eks" {
     ManagedBy   = "terraform"
     Project     = var.project_name
   })
-}
-
-module "karpenter" {
-  source  = "terraform-aws-modules/eks/aws//modules/karpenter"
-  version = "~> 20.0"
-
-  cluster_name = module.eks.cluster_name
-
-  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
-
-  tags = {
-    "karpenter.sh/discovery" = module.eks.cluster_name
-  }
 }
 
 resource "helm_release" "karpenter" {
