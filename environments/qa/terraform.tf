@@ -41,6 +41,7 @@ provider "aws" {
       Environment = var.env
       Terraform   = "true"
       ManagedBy   = "terraform"
+      Owner       = "Platform Team"
     }
   }
 }
