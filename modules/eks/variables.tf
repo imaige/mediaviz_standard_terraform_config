@@ -243,10 +243,6 @@ variable "evidence_gpu_nodepool_capacity_type" {
   description = "Capacity type for the evidence GPU node group"
   type        = list(string)
   default     = ["on-demand"]
-  validation {
-    condition     = contains(["on-demand", "spot"], var.evidence_gpu_nodepool_capacity_type)
-    error_message = "Valid capacity-types are: (on-demand, spot)"
-  }
 }
 
 variable "evidence_gpu_nodepool_max_cpu" {

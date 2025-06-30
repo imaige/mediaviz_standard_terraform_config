@@ -16,9 +16,6 @@ module "eks" {
   cluster_endpoint_private_access = true
   enable_irsa                     = true
 
-  # enable Karpenter
-  enable_karpenter = true
-
   # Authentication configuration
   authentication_mode = "API"
 
@@ -369,16 +366,29 @@ module "eks" {
     ManagedBy   = "terraform"
     Project     = var.project_name
   })
+
+}
+
+module "karpenter" {
+  source  = "terraform-aws-modules/eks/aws//modules/karpenter" # Note the "//modules/karpenter"
+  version = "~> 20.31"
+
+  cluster_name           = module.eks.cluster_name
+  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
+
+  irsa_namespace_service_accounts = ["karpenter:karpenter"]
+  enable_spot_termination         = true
 }
 
 resource "helm_release" "karpenter" {
+
   namespace        = "karpenter"
   create_namespace = true
   name             = "karpenter"
   # This chart is v1.5.1
   chart   = "${path.module}/chart/karpenter"
   wait    = true
-  timeout = "10m"
+  timeout = "10"
 
   # Values passed to the Helm chart
   set {
@@ -416,118 +426,125 @@ resource "kubernetes_manifest" "high_power_gpu_ec2nodeclass" {
     helm_release.karpenter
   ]
 
-  yaml_body = <<-EOT
-    apiVersion: karpenter.k8s.aws/v1beta1
-    kind: EC2NodeClass
-    metadata:
-      name: karpenter-high-power-gpu-node-class
-      namespace: ${var.namespace}
-      annotations:
-        kubernetes.io/description: "Karpenter-managed EC2NodeClass for high-power GPU"
-    spec:
+  manifest = {
+    "apiVersion" = "karpenter.k8s.aws/v1beta1"
+    "kind"       = "EC2NodeClass"
+    "metadata" = {
+      "name"      = "karpenter-high-power-gpu-node-class"
+      "namespace" = "${var.namespace}"
+      "annotations" = {
+        "kubernetes.io/description" = "Karpenter-managed EC2NodeClass for high-power GPU"
+      }
+    }
 
+    "spec" = {
       # For AL2023_x86_64_NVIDIA, the amiFamily is "AL2023".
-      amiFamily: AL2023
-      role: "${module.eks.karpenter.node_iam_role_arn}"
+      "amiFamily" = "AL2023"
+      "role"      = "${module.karpenter.node_iam_role_arn}"
 
       # Security groups and Subnets are discovered via tags.
-      securityGroupSelector:
-        karpenter.sh/discovery: "${module.eks.cluster_name}"
-      subnetSelector:
-        karpenter.sh/discovery: "${module.eks.cluster_name}"
+      "securityGroupSelector" = {
+        "karpenter.sh/discovery" = "${module.eks.cluster_name}"
+      }
+      "subnetSelector" = {
+        "karpenter.sh/discovery" = "${module.eks.cluster_name}"
+      }
 
       # EBS Block device
-      blockDeviceMappings:
-        - deviceName: /dev/xvda
-          ebs:
-            volumeSize: 1000Gi
-            volumeType: gp3
-            iops: 16000
-            throughput: 1000
-            encrypted: true
-            kmsKeyId: "${var.kms_key_arn}"
-            deleteOnTermination: true
+      "blockDeviceMappings" = {
+        "deviceName" = "/dev/xvda"
+        "ebs" = {
+          "volumeSize"          = "1000Gi"
+          "volumeType"          = "gp3"
+          "iops"                = 16000
+          "throughput"          = 1000
+          "encrypted"           = true
+          "kmsKeyId"            = "${var.kms_key_arn}"
+          "deleteOnTermination" = true
+        }
+      }
 
       # Tags to apply to the individual ec2 instances
-      tags:
-        Name: "${var.project_name}-${var.env}-high-power-gpu-node"
-        NodeGroup: high-power-gpu
-        WorkloadType: evidence-model
-        GpuType: nvidia-a10g
-        Environment: "${var.env}"
-        ManagedBy: karpenter
-        karpenter.sh/nodepool: high-power-gpu
-  EOT
+      "tags" = {
+        "Name"                  = "${var.project_name}-${var.env}-high-power-gpu-node"
+        "NodeGroup"             = "high-power-gpu"
+        "WorkloadType"          = "evidence-model"
+        "GpuType"               = "nvidia-a10g"
+        "Environment"           = "${var.env}"
+        "ManagedBy"             = "karpenter"
+        "karpenter.sh/nodepool" = "high-power-gpu"
+      }
+    }
+  }
 }
 
 # NodePools define the Kubernetes-level requirements for the nodes
-resource "kubernetes_manifest" "high_power_gpu_nodepool" {
-
-  depends_on = [
-    kubernetes_manifest.high_power_gpu_ec2nodeclass,
-    helm_release.keda
-  ]
-
-  yaml_body = <<-EOT
-    apiVersion: karpenter.k8s.aws/v1beta1
-    kind: NodePool
-    metadata:
-      name: karpenter-high-power-gpu-nodepool
-    spec:
-      template:
-        spec:
-          # Karpenter will select the most cost-effective instance type that satisfies these requirements.
-          requirements:
-            - key: karpenter.k8s.aws/instance-type
-              operator: In
-              values: ${var.evidence_gpu_instance_types}
-            - key: kubernetes.io/arch
-              operator: In
-              values: ["amd64"]
-            - key: kubernetes.io/os
-              operator: In
-              values: ["linux"]
-            - key: karpenter.k8s.aws/capacity-type
-              operator: In
-              values: ${var.evidence_gpu_nodepool_capacity_type}
-
-          # Which node class do we refer back to?
-          nodeClassRef:
-            apiVersion: karpenter.k8s.aws/v1beta1
-            kind: EC2NodeClass
-            name: karpenter-high-power-gpu-node-class
-
-          # Labels applied to the Kubernetes Node object.
-          labels:
-            "nvidia.com/gpu.present": "true"
-            "nvidia.com/gpu.product": "A10G"
-            "node-type": "high-power-gpu"
-            "karpenter.s/nodepool": "high-power-gpu-nodepool"
-
-          # Taints applied to the Kubernetes Node object.
-          taints:
-            - key: "nvidia.com/gpu"
-              value: "true"
-              effect: "NoSchedule"
-
-      # These limits are total limits of compute and memory
-      # We previously had four g5.4xlarge nodes
-      # Each node has 16vCPUs and 64GiB of memory
-      # And these are the variable defaults
-      limits:
-        cpu: ${var.evidence_gpu_nodepool_max_cpu}
-        memory: ${var.evidence_gpu_nodepool_max_mem}
-
-      # The `disruption` configuration tells Karpenter how to clean up nodes when they are no longer needed.
-      disruption:
-        # WhenUnderutilized: Removes nodes that are under-utilized AND can be consolidated.
-        # WhenEmpty: Only removes nodes with no running pods (excluding Kube-system or daemonsets).
-        consolidationPolicy: WhenEmpty
-
-        # ExpireAfter: Terminates nodes after a set duration, forcing a refresh.
-        # 720h is 30 days.
-        expireAfter: 720h
-  EOT
+resource "kubernetes_manifest" "nodepool_karpenter_high_power_gpu_nodepool" {
+  manifest = {
+    "apiVersion" = "karpenter.k8s.aws/v1beta1"
+    "kind"       = "NodePool"
+    "metadata" = {
+      "name" = "karpenter-high-power-gpu-nodepool"
+    }
+    "spec" = {
+      "disruption" = {
+        "consolidationPolicy" = "WhenEmpty"
+        "expireAfter"         = "720h"
+      }
+      "limits" = {
+        "cpu"    = "$${var.evidence_gpu_nodepool_max_cpu}"
+        "memory" = "$${var.evidence_gpu_nodepool_max_mem}"
+      }
+      "template" = {
+        "spec" = {
+          "labels" = {
+            "karpenter.s/nodepool"   = "high-power-gpu-nodepool"
+            "node-type"              = "high-power-gpu"
+            "nvidia.com/gpu.present" = "true"
+            "nvidia.com/gpu.product" = "A10G"
+          }
+          "nodeClassRef" = {
+            "apiVersion" = "karpenter.k8s.aws/v1beta1"
+            "kind"       = "EC2NodeClass"
+            "name"       = "karpenter-high-power-gpu-node-class"
+          }
+          "requirements" = [
+            {
+              "key"      = "karpenter.k8s.aws/instance-type"
+              "operator" = "In"
+              "values"   = "$${var.evidence_gpu_instance_types}"
+            },
+            {
+              "key"      = "kubernetes.io/arch"
+              "operator" = "In"
+              "values" = [
+                "amd64",
+              ]
+            },
+            {
+              "key"      = "kubernetes.io/os"
+              "operator" = "In"
+              "values" = [
+                "linux",
+              ]
+            },
+            {
+              "key"      = "karpenter.k8s.aws/capacity-type"
+              "operator" = "In"
+              "values"   = "$${var.evidence_gpu_nodepool_capacity_type}"
+            },
+          ]
+          "taints" = [
+            {
+              "effect" = "NoSchedule"
+              "key"    = "nvidia.com/gpu"
+              "value"  = "true"
+            },
+          ]
+        }
+      }
+    }
+  }
 }
 
 
