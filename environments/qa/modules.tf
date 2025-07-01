@@ -221,7 +221,7 @@ module "sqs" {
   # Base configuration
   visibility_timeout = 300 # 5 minutes
   enable_dlq         = true
-  max_receive_count  = 30
+  max_receive_count  = 100
 
   # Source ARNs
   source_arns = concat(
@@ -341,15 +341,15 @@ module "eks_processors" {
   enable_helm_deployments = true
 
   # Resource settings
-  replicas       = 1
+  replicas = 1
   model_replicas = {
-    "evidence-model"             = 3
-    "image-classification-model" = 4  # 4 on spot + 1 on on-demand = 5 total
-    "feature-extraction-model"   = 0  # 0 on spot + 1 on on-demand = 1 total  
-    "external-api"               = 1
-    "similarity-model"           = 0  # 0 on spot + 1 on on-demand = 1 total
+    "evidence-model"                 = 3
+    "image-classification-model"     = 4 # 4 on spot + 1 on on-demand = 5 total
+    "feature-extraction-model"       = 0 # 0 on spot + 1 on on-demand = 1 total  
+    "external-api"                   = 1
+    "similarity-model"               = 0 # 0 on spot + 1 on on-demand = 1 total
     "similarity-set-sorting-service" = 1
-    "personhood-model"           = 1
+    "personhood-model"               = 1
   }
   cpu_request    = "100m"
   memory_request = "128Mi"
@@ -407,7 +407,7 @@ module "eks_processors_ondemand" {
   enable_helm_deployments = true
 
   # Resource settings - only deploy the 3 models on on-demand nodes (1 replica each)
-  replicas       = 1
+  replicas = 1
   model_replicas = {
     "feature-extraction-model"   = 1
     "image-classification-model" = 1
@@ -506,27 +506,27 @@ module "monitoring" {
   kms_key_arn = module.security.kms_key_arn
 
   # EKS integration
-  enable_eks_integration    = true
-  deploy_prometheus_to_eks  = true
+  enable_eks_integration   = true
+  deploy_prometheus_to_eks = true
   oidc_provider_arn        = module.eks.oidc_provider_arn
   oidc_provider            = module.eks.oidc_provider
-  
+
   # Monitoring configuration
   prometheus_namespace       = "amazon-cloudwatch"
   prometheus_service_account = "cloudwatch-agent"
-  log_retention_days        = 365
+  log_retention_days         = 365
 
   # Grafana configuration
   notification_destinations = ["SNS"]
-  vpc_id                   = module.vpc.vpc_id
-  grafana_allowed_cidrs    = var.bastion_allowed_ips # Use same IPs as bastion
+  vpc_id                    = module.vpc.vpc_id
+  grafana_allowed_cidrs     = var.bastion_allowed_ips # Use same IPs as bastion
 
   # CloudWatch alarms
   enable_cloudwatch_alarms = true
 
   # Grafana API key settings
   create_prometheus_datasource = true
-  api_key_seconds_to_live     = 2592000 # 30 days
+  api_key_seconds_to_live      = 2592000 # 30 days
 
   tags = var.tags
 }
