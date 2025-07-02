@@ -626,11 +626,12 @@ resource "aws_cloudwatch_log_group" "eks_logs" {
 resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
 
-  name       = "nvdp"
-  repository = "https://nvidia.github.io/k8s-device-plugin"
-  chart      = "nvidia-device-plugin"
-  version    = var.nvidia_plugin_version
-  namespace  = "kube-system"
+  name             = "nvdp"
+  repository       = "https://nvidia.github.io/k8s-device-plugin"
+  chart            = "nvidia-device-plugin"
+  version          = var.nvidia_plugin_version
+  namespace        = "nvidia-device-plugin"
+  create_namespace = true
 
   values = [
     yamlencode({
