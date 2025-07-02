@@ -62,9 +62,10 @@ variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
   default = {
-    environment = "qa"
-    terraform   = "true"
-    project     = "mediaviz-serverless"
+    Environment = "dev"
+    Terraform   = "true"
+    Project     = "mediaviz-serverless"
+    ManagedBy   = "terraform"
   }
 }
 

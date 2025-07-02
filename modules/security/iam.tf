@@ -48,7 +48,7 @@ resource "aws_ssoadmin_permission_set" "eks_admin" {
 
 # Create an IAM role for EKS admins - this doesn't depend on SSO
 resource "aws_iam_role" "eks_admin" {
-  name = "${var.project_name}-${var.env}-eks-admin"
+  name = "${var.project_name}${var.project_suffix}-${var.env}-eks-admin"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -75,7 +75,7 @@ resource "aws_iam_role" "eks_admin" {
   })
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.env}-eks-admin"
+    Name = "${var.project_name}${var.project_suffix}-${var.env}-eks-admin"
   })
 }
 

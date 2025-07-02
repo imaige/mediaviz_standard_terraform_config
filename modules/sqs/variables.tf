@@ -100,3 +100,10 @@ variable "model_specific_config" {
   description = "Model-specific configurations for each processing queue"
   default     = {}
 }
+
+variable "project_suffix" {
+  description = "A suffix for our project name"
+  type        = string
+  default     = ""
+}
+

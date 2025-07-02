@@ -57,7 +57,7 @@ resource "aws_sqs_queue" "image_processing_dlq" {
 resource "aws_sqs_queue" "model_queues" {
   for_each = toset(local.all_models)
 
-  name = "${var.project_name}-${var.env}-${each.key}-queue"
+  name = can(regex("^lambda-", each.key)) ? "${var.project_name}-serverless-${var.env}-${each.key}-queue" : "${var.project_name}-${var.env}-${each.key}-queue"
 
   visibility_timeout_seconds = try(var.model_specific_config[each.key].visibility_timeout, var.visibility_timeout)
   message_retention_seconds  = var.retention_period
@@ -88,7 +88,7 @@ resource "aws_sqs_queue" "model_queues" {
 resource "aws_sqs_queue" "model_dlqs" {
   for_each = var.enable_dlq ? toset(local.all_models) : []
 
-  name = "${var.project_name}-${var.env}-${each.key}-dlq"
+  name = can(regex("^lambda-", each.key)) ? "${var.project_name}-serverless-${var.env}-${each.key}-dlq" : "${var.project_name}-${var.env}-${each.key}-dlq"
 
   message_retention_seconds = var.dlq_retention_period
   receive_wait_time_seconds = 20

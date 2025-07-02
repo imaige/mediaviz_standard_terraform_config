@@ -4,7 +4,7 @@ data "aws_region" "current" {}
 
 # General encryption key for the project
 resource "aws_kms_key" "encryption" {
-  description             = "${var.project_name}-${var.env}-encryption-key"
+  description             = "${var.project_name}${var.project_suffix}-${var.env}-encryption-key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
   multi_region            = true
@@ -76,7 +76,7 @@ resource "aws_kms_key" "encryption" {
   })
 
   tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.env}-encryption"
+    Name        = "${var.project_name}${var.project_suffix}-${var.env}-encryption"
     Environment = var.env
     Terraform   = "true"
   })

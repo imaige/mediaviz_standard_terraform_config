@@ -18,6 +18,8 @@ module "security" {
   enable_sso              = false
   github_actions_role_arn = module.github_oidc.role_arn
 
+  project_suffix = "-serverless"
+
   tags = var.tags
 }
 

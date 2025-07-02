@@ -14,8 +14,8 @@ locals {
   )
 
   # Use bucket_suffix if provided, otherwise use default names
-  primary_bucket_name     = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}" : "${var.project_name}-${var.env}-uploads"
-  logs_bucket_name        = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-logs" : "${var.project_name}-${var.env}-uploads-logs"
+  primary_bucket_name     = var.bucket_suffix != "" ? "${var.project_name}-serverless-${var.env}-${var.bucket_suffix}" : "${var.project_name}-${var.env}-uploads"
+  logs_bucket_name        = var.bucket_suffix != "" ? "${var.project_name}-serverless-${var.env}-${var.bucket_suffix}-logs" : "${var.project_name}-${var.env}-uploads-logs"
   processed_bucket_name   = var.bucket_suffix != "" ? "${var.project_name}-${var.env}-${var.bucket_suffix}-processed" : "${var.project_name}-${var.env}-processed"
   helm_charts_bucket_name = var.helm_charts_bucket_name != "" ? var.helm_charts_bucket_name : "${var.project_name}-${var.env}-helm-charts"
 }

@@ -34,3 +34,9 @@ variable "github_actions_role_arn" {
   type        = string
   default     = "" # Empty default to make it optional
 }
+
+variable "project_suffix" {
+  description = "A suffix for our project name"
+  type        = string
+  default     = ""
+}
