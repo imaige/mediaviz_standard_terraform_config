@@ -7,7 +7,7 @@ module "vpc" {
 
   azs             = data.aws_availability_zones.available.names
   public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"]
-  private_subnets = ["192.168.16.0/22", "192.168.20.0/22", "192.168.24.0/22", "192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
+  private_subnets = var.private_subnets
 
   enable_nat_gateway   = true
   single_nat_gateway   = true

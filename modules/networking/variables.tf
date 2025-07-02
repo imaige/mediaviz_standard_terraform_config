@@ -13,3 +13,10 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "private_subnets" {
+  description = "A list of private subnet cidr blocks"
+  type        = list(string)
+  default     = ["192.168.16.0/22", "192.168.20.0/22", "192.168.24.0/22", "192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
+}
+

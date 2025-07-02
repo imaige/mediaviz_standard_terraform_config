@@ -2,6 +2,8 @@
 module "vpc" {
   source = "./../../modules/networking"
 
+  private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
+
   cluster_name = var.cluster_name
   env          = var.env
   tags         = var.tags
@@ -254,7 +256,7 @@ module "sqs" {
 module "aurora" {
   source = "./../../modules/aurora"
 
-  project_name = var.project_name
+  project_name = "${var.project_name}-serverless"
   env          = var.env
   vpc_id       = module.vpc.vpc_id
   subnet_ids   = module.vpc.private_subnets
@@ -266,8 +268,8 @@ module "aurora" {
   eks_node_security_group_id = module.eks.node_security_group_id
 
   instance_count = 1   # Single instance for dev
-  min_capacity   = 0.5 # Start lower for dev
-  max_capacity   = 16  # Much lower ceiling for dev
+  min_capacity   = 1   # Start lower for dev
+  max_capacity   = 256 # Much lower ceiling for dev
 
   tags = var.tags
 }
