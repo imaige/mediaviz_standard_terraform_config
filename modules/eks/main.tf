@@ -652,8 +652,8 @@ resource "helm_release" "nvidia_device_plugin" {
 
 # Node IAM policy with least privilege
 resource "aws_iam_policy" "node_secrets_policy" {
-  name        = "${var.project_name}-${var.env}-node-access-policy"
-  description = "Policy allowing EKS nodes to access required resources"
+  name        = var.node_secrets_policy_metadata["name"]
+  description = var.node_secrets_policy_metadata["description"]
 
   policy = jsonencode({
     Version = "2012-10-17"

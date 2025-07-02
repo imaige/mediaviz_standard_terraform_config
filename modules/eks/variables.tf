@@ -256,3 +256,8 @@ variable "evidence_gpu_nodepool_max_mem" {
   type        = string
   default     = "256Gi"
 }
+
+variable "node_secrets_policy_metadata" {
+  description = "name and description of the eks node policy"
+}
+

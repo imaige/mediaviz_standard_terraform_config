@@ -95,6 +95,11 @@ module "eks" {
     }
   }
 
+  node_secrets_policy_metadata = {
+    name        = "${var.project_name}-${var.env}-node-access-policy"
+    description = "Policy allowing EKS nodes to access required resources"
+  }
+
   tags = var.tags
 }
 

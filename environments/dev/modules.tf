@@ -93,6 +93,9 @@ module "eks" {
       principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_1b02cabbd428e5e0"
       type              = "STANDARD"
     }
+  node_secrets_policy_metadata = {
+    name        = "${var.project_name}-${var.env}-node-secrets-access"
+    description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
   }
 
   tags = var.tags
