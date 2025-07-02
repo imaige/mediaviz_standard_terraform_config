@@ -77,22 +77,24 @@ module "eks" {
   install_nvidia_plugin       = true
   create_kubernetes_resources = true
 
-  additional_access_entries = {
-    caleb_sso = {
-      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
-      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_e2f331b752f1e129"
-      type              = "STANDARD"
-    },
-    dmitrii_sso = {
-      kubernetes_groups = ["cluster-admin"] # Changed from system:masters
-      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSAdministratorAccess_472a40aff28af737"
-      type              = "STANDARD"
-    },
-    mediaviz_developers = {
-      kubernetes_groups = ["MediavizDevelopers"]
-      principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_1b02cabbd428e5e0"
-      type              = "STANDARD"
-    }
+  # additional_access_entries = {
+  #   caleb_sso = {
+  #     kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+  #     principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_e2f331b752f1e129"
+  #     type              = "STANDARD"
+  #   },
+  #   dmitrii_sso = {
+  #     kubernetes_groups = ["cluster-admin"] # Changed from system:masters
+  #     principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSAdministratorAccess_472a40aff28af737"
+  #     type              = "STANDARD"
+  #   },
+  #   mediaviz_developers = {
+  #     kubernetes_groups = ["MediavizDevelopers"]
+  #     principal_arn     = "arn:aws:iam::515966522375:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_1b02cabbd428e5e0"
+  #     type              = "STANDARD"
+  #   }
+  # }
+
   node_secrets_policy_metadata = {
     name        = "${var.project_name}-${var.env}-node-secrets-access"
     description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
