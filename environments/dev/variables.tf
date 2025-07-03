@@ -22,12 +22,6 @@ variable "aws_account_id" {
   default     = "379283424934" # Your current AWS account ID
 }
 
-variable "eks_primary_instance_type" {
-  description = "Instance type for the EKS node group"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
 variable "eks_managed_node_groups" {
   description = "Map of EKS managed node group configurations"
   type        = map(any)
@@ -70,6 +64,7 @@ variable "tags" {
 }
 
 # Optional: Add if you need different node group sizes per environment
+# "primary" node group
 variable "node_group_min_size" {
   description = "Minimum size of the EKS node group"
   type        = number
@@ -182,6 +177,7 @@ variable "shared_ecr_repositories" {
   ]
 }
 
+# "gpu" node group
 variable "gpu_instance_types" {
   description = "Instance types for the GPU node group"
   type        = list(string)
@@ -221,6 +217,7 @@ variable "bastion_allowed_ips" {
   ]
 }
 
+# high_power node group
 variable "evidence_gpu_instance_types" {
   description = "Instance types for the evidence model GPU node group"
   type        = list(string)
@@ -236,12 +233,38 @@ variable "evidence_gpu_node_min_size" {
 variable "evidence_gpu_node_max_size" {
   description = "Maximum size of the evidence GPU node group"
   type        = number
-  default     = 3
+  default     = 2
 }
 
 variable "evidence_gpu_node_desired_size" {
   description = "Desired size of the evidence GPU node group"
   type        = number
   default     = 1
+}
+
+# Primary node group
+
+variable "eks_primary_instance_type" {
+  description = "Instance type for the EKS node group"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "primary_nodepool_capacity_type" {
+  description = "Capacity type for the primary node group"
+  type        = list(string)
+  default     = ["on-demand"]
+}
+
+variable "primary_nodepool_max_cpu" {
+  description = "Maximum CPU limit for primary nodes"
+  type        = number
+  default     = 2
+}
+
+variable "primary_nodepool_max_mem" {
+  description = "Maximum memory limit for primary nodes"
+  type        = string
+  default     = "4Gi"
 }
 

@@ -257,6 +257,24 @@ variable "evidence_gpu_nodepool_max_mem" {
   default     = "256Gi"
 }
 
+variable "primary_nodepool_capacity_type" {
+  description = "Capacity type for the primary node group"
+  type        = list(string)
+  default     = ["on-demand"]
+}
+
+variable "primary_nodepool_max_cpu" {
+  description = "Maximum CPU limit for primary nodes"
+  type        = number
+  default     = 64
+}
+
+variable "primary_nodepool_max_mem" {
+  description = "Maximum memory limit for primary nodes"
+  type        = string
+  default     = "256Gi"
+}
+
 variable "node_secrets_policy_metadata" {
   description = "name and description of the eks node policy"
 }
