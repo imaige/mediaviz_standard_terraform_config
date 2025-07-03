@@ -419,7 +419,7 @@ resource "helm_release" "karpenter" {
 # Karpenter NodePool and EC2NodeClasses to replace the EKS managed nodegroups
 # These are kubernetes custom resources
 
-resource "kubernetes_manifest" "primary" {
+resource "kubernetes_manifest" "karpenter_primary_ec2nodeclass" {
   # Depends on the Karpenter Helm release being deployed
 
   depends_on = [
@@ -438,7 +438,6 @@ resource "kubernetes_manifest" "primary" {
     }
 
     "spec" = {
-      # For AL2023_x86_64_NVIDIA, the amiFamily is "AL2023".
       "amiFamily" = "AL2023"
       "role"      = module.karpenter.node_iam_role_arn
 
@@ -479,7 +478,7 @@ resource "kubernetes_manifest" "primary" {
 }
 
 # NodePools define the Kubernetes-level requirements for the nodes
-resource "kubernetes_manifest" "nodepool_karpenter_primary_nodepool" {
+resource "kubernetes_manifest" "karpenter_primary_nodepool" {
   manifest = {
     "apiVersion" = "karpenter.k8s.aws/v1beta1"
     "kind"       = "NodePool"
@@ -539,7 +538,7 @@ resource "kubernetes_manifest" "nodepool_karpenter_primary_nodepool" {
   }
 }
 
-resource "kubernetes_manifest" "high_power_gpu_ec2nodeclass" {
+resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
   # Depends on the Karpenter Helm release being deployed
 
   depends_on = [
@@ -599,7 +598,7 @@ resource "kubernetes_manifest" "high_power_gpu_ec2nodeclass" {
 }
 
 # NodePools define the Kubernetes-level requirements for the nodes
-resource "kubernetes_manifest" "nodepool_karpenter_high_power_gpu_nodepool" {
+resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
   manifest = {
     "apiVersion" = "karpenter.k8s.aws/v1beta1"
     "kind"       = "NodePool"
