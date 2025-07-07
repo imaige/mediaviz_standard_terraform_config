@@ -41,6 +41,13 @@ variable "cluster_version" {
   default     = "1.32"
 }
 
+variable "karpenter_cluster_version" {
+  description = "Kubernetes version to use for the EKS cluster"
+  type        = string
+  default     = "1.33"
+}
+
+
 variable "cluster_addons" {
   description = "Map of cluster addon configurations"
   type        = map(any)
@@ -80,7 +87,7 @@ variable "node_group_max_size" {
 variable "node_group_desired_size" {
   description = "Desired size of the EKS node group"
   type        = number
-  default     = 6
+  default     = 3
 }
 
 variable "cors_allowed_origins" {
@@ -199,7 +206,7 @@ variable "gpu_node_max_size" {
 variable "gpu_node_desired_size" {
   description = "Desired size of the GPU node group"
   type        = number
-  default     = 3
+  default     = 1
 }
 
 variable "bastion_allowed_ips" {

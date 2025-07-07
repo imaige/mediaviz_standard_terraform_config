@@ -3,6 +3,11 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "karpenter_cluster_name" {
+  description = "Name of the Karpenter-managed eks cluster"
+  type        = string
+}
+
 variable "env" {
   description = "Environment name (dev, prod, etc)"
   type        = string

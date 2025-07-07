@@ -4,9 +4,10 @@ module "vpc" {
 
   private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
 
-  cluster_name = var.cluster_name
-  env          = var.env
-  tags         = var.tags
+  karpenter_cluster_name = "${var.project_name}-${var.env}-karpenter"
+  cluster_name           = var.cluster_name
+  env                    = var.env
+  tags                   = var.tags
 }
 
 module "security" {
@@ -94,6 +95,66 @@ module "eks" {
   #     type              = "STANDARD"
   #   }
   # }
+
+  node_secrets_policy_metadata = {
+    name        = "${var.project_name}-${var.env}-node-secrets-access"
+    description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
+  }
+
+  tags = var.tags
+}
+
+module "eks-karpenter" {
+  source = "./../../modules/eks"
+
+  project_name    = var.project_name
+  cluster_name    = var.cluster_name
+  env             = var.env
+  cluster_version = var.karpenter_cluster_version
+  aws_region      = data.aws_region.current.name
+
+  vpc_id                   = module.vpc.vpc_id
+  subnet_ids               = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.public_subnets
+
+  eks_primary_instance_type = var.eks_primary_instance_type
+  node_group_min_size       = var.node_group_min_size
+  node_group_max_size       = var.node_group_max_size
+  node_group_desired_size   = var.node_group_desired_size
+
+  # Use GPU instance types variable
+  gpu_instance_types    = var.gpu_instance_types
+  gpu_node_min_size     = var.gpu_node_min_size
+  gpu_node_max_size     = var.gpu_node_max_size
+  gpu_node_desired_size = var.gpu_node_desired_size
+
+  # Evidence model dedicated GPU nodes
+  evidence_gpu_instance_types    = var.evidence_gpu_instance_types
+  evidence_gpu_node_min_size     = var.evidence_gpu_node_min_size
+  evidence_gpu_node_max_size     = var.evidence_gpu_node_max_size
+  evidence_gpu_node_desired_size = var.evidence_gpu_node_desired_size
+
+  aws_account_id     = data.aws_caller_identity.current.account_id
+  kms_key_arn        = module.security.kms_key_arn
+  eks_admin_role_arn = module.security.eks_admin_role_arn
+
+  # Add SQS, S3, and Aurora access
+  sqs_queue_arns = values(module.sqs.lambda_queue_arns)
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    "${module.s3.bucket_arn}/*"
+  ]
+  aurora_cluster_arns = [module.aurora.cluster_arn]
+
+  # Cross account access
+  enable_shared_access   = true
+  shared_access_role_arn = module.cross_account_roles.role_arn
+
+  # Enable developer role for MediavizDevelopers group
+  create_developer_role = true
+
+  install_nvidia_plugin       = true
+  create_kubernetes_resources = true
 
   node_secrets_policy_metadata = {
     name        = "${var.project_name}-${var.env}-node-secrets-access"

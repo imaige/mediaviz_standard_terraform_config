@@ -36,6 +36,7 @@ module "vpc" {
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = "1"
     "Environment"                     = var.env
+    "karpenter.sh/discovery"          = var.karpenter_cluster_name
   }
 }
 

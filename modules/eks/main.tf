@@ -369,18 +369,164 @@ module "eks" {
 
 }
 
+module "eks-karpenter" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.31"
+
+  create_cloudwatch_log_group = false
+
+  cluster_name    = "${var.project_name}-${var.env}-karpenter"
+  cluster_version = var.cluster_version
+
+  vpc_id                   = var.vpc_id
+  subnet_ids               = var.subnet_ids
+  control_plane_subnet_ids = var.control_plane_subnet_ids
+
+  # Security configurations
+  cluster_endpoint_public_access  = true
+  cluster_endpoint_private_access = true
+  enable_irsa                     = true
+
+  # Authentication configuration
+  authentication_mode = "API"
+
+  access_entries = merge(
+    {
+      # Admin access
+      admin = {
+        kubernetes_groups = ["cluster-admin"]
+        principal_arn     = var.eks_admin_role_arn
+        type              = "STANDARD"
+      }
+    },
+    var.github_actions_role_arn != "" ? {
+      # CI/CD access for deployments
+      cicd = {
+        kubernetes_groups = ["system:masters"]
+        principal_arn     = var.github_actions_role_arn
+        type              = "STANDARD"
+      }
+    } : {},
+    var.additional_access_entries # Add this line to include the additional entries
+  )
+
+
+  # Enable encryption for Kubernetes secrets
+  cluster_encryption_config = {
+    provider_key_arn = var.kms_key_arn
+    resources        = ["secrets"]
+  }
+
+  # Cluster addons with automatic updates
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    eks-pod-identity-agent = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+      configuration_values = jsonencode({
+        env = {
+          ENABLE_PREFIX_DELEGATION = "true"
+          WARM_ENI_TARGET          = "2"
+          MINIMUM_IP_TARGET        = "10"
+        }
+      })
+    }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.ebs_csi_role.arn
+    }
+  }
+
+  enable_cluster_creator_admin_permissions = true
+
+  # Define node groups with appropriate configurations
+  eks_managed_node_groups = {
+    karpenter = {
+      ami_type       = "AL2023_x86_64_STANDARD"
+      instance_types = ["t3.medium"]
+
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
+
+      labels = {
+        # Used to ensure Karpenter runs on nodes that it does not manage
+        "karpenter.sh/controller" = "true"
+      }
+      create_iam_role = true
+      iam_role_additional_policies = {
+        secrets_policy = aws_iam_policy.node_secrets_policy.arn,
+        ssm_policy     = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }
+    }
+  }
+
+  # Enable logging for audit and troubleshooting
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
+  # Fargate profile for system workloads (optional)
+  fargate_profiles = var.enable_fargate ? {
+    system = {
+      name = "system"
+      selectors = [
+        {
+          namespace = "kube-system"
+          labels = {
+            k8s-app = "kube-dns"
+          }
+        },
+        {
+          namespace = "monitoring"
+        }
+      ]
+      tags = {
+        Environment = var.env
+        Terraform   = "true"
+      }
+    }
+  } : {}
+
+  # Module tags
+  tags = merge(var.tags, {
+    Environment = var.env
+    ManagedBy   = "terraform"
+    Project     = var.project_name
+  })
+
+}
+
 module "karpenter" {
+
+  depends_on = [
+    module.eks-karpenter
+  ]
+
   source  = "terraform-aws-modules/eks/aws//modules/karpenter" # Note the "//modules/karpenter"
   version = "~> 20.31"
 
-  cluster_name           = module.eks.cluster_name
-  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
+  cluster_name           = module.eks-karpenter.cluster_name
+  irsa_oidc_provider_arn = module.eks-karpenter.oidc_provider_arn
 
   irsa_namespace_service_accounts = ["karpenter:karpenter"]
-  enable_spot_termination         = true
+  create_instance_profile         = true
+  node_iam_role_additional_policies = {
+    AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  }
+  enable_spot_termination = true
 }
 
 resource "helm_release" "karpenter" {
+
+  depends_on = [
+    module.karpenter
+  ]
 
   namespace        = "karpenter"
   create_namespace = true
@@ -388,7 +534,7 @@ resource "helm_release" "karpenter" {
   # This chart is v1.5.1
   chart   = "${path.module}/chart/karpenter"
   wait    = true
-  timeout = "10"
+  timeout = "900"
 
   # Values passed to the Helm chart
   set {
@@ -400,13 +546,7 @@ resource "helm_release" "karpenter" {
   set {
     # The cluster being managed
     name  = "settings.clusterName"
-    value = module.eks.cluster_name # Value from the EKS module output
-  }
-
-  set {
-    # The default instance profile
-    name  = "settings.aws.defaultInstanceProfile"
-    value = module.karpenter.instance_profile_name
+    value = module.eks-karpenter.cluster_name # Value from the EKS module output
   }
 
   set {
@@ -443,10 +583,10 @@ resource "kubernetes_manifest" "karpenter_primary_ec2nodeclass" {
 
       # Security groups and Subnets are discovered via tags.
       "securityGroupSelector" = {
-        "karpenter.sh/discovery" = module.eks.cluster_name
+        "karpenter.sh/discovery" = module.eks-karpenter.cluster_name
       }
       "subnetSelector" = {
-        "karpenter.sh/discovery" = module.eks.cluster_name
+        "karpenter.sh/discovery" = module.eks-karpenter.cluster_name
       }
 
       # EBS Block device
@@ -479,6 +619,10 @@ resource "kubernetes_manifest" "karpenter_primary_ec2nodeclass" {
 
 # NodePools define the Kubernetes-level requirements for the nodes
 resource "kubernetes_manifest" "karpenter_primary_nodepool" {
+  depends_on = [
+    helm_release.karpenter
+  ]
+
   manifest = {
     "apiVersion" = "karpenter.k8s.aws/v1beta1"
     "kind"       = "NodePool"
@@ -497,7 +641,7 @@ resource "kubernetes_manifest" "karpenter_primary_nodepool" {
       "template" = {
         "spec" = {
           "labels" = {
-            "karpenter.s/nodepool"   = "primary-nodepool"
+            "karpenter.sh/nodepool"  = "primary"
             "node-type"              = "primary"
             "nvidia.com/gpu.present" = "false"
           }
@@ -563,10 +707,10 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
 
       # Security groups and Subnets are discovered via tags.
       "securityGroupSelector" = {
-        "karpenter.sh/discovery" = module.eks.cluster_name
+        "karpenter.sh/discovery" = module.eks-karpenter.cluster_name
       }
       "subnetSelector" = {
-        "karpenter.sh/discovery" = module.eks.cluster_name
+        "karpenter.sh/discovery" = module.eks-karpenter.cluster_name
       }
 
       # EBS Block device
@@ -599,6 +743,10 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
 
 # NodePools define the Kubernetes-level requirements for the nodes
 resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
+
+  depends_on = [
+    helm_release.karpenter
+  ]
   manifest = {
     "apiVersion" = "karpenter.k8s.aws/v1beta1"
     "kind"       = "NodePool"
@@ -617,7 +765,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
       "template" = {
         "spec" = {
           "labels" = {
-            "karpenter.s/nodepool"   = "high-power-gpu-nodepool"
+            "karpenter.sh/nodepool"  = "high-power-gpu-nodepool"
             "node-type"              = "high-power-gpu"
             "nvidia.com/gpu.present" = "true"
             "nvidia.com/gpu.product" = "A10G"
@@ -679,7 +827,7 @@ module "helm_release" "keda" {
   set {
     # The cluster name
     name  = "ClusterName"
-    value = module.eks.cluster_name
+    value = module.eks-karpenter.cluster_name
   }
 
   set {
@@ -690,7 +838,7 @@ module "helm_release" "keda" {
   set {
     # IRSA RoleArn
     name  = "podIdentity.aws.irsa.roleArn"
-    value = module.eks.oidc_provider_arn
+    value = module.eks-karpenter.oidc_provider_arn
   }
   set {
     # logging
