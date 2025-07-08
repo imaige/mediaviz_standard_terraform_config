@@ -181,7 +181,7 @@ resource "kubernetes_cluster_role_binding" "mediaviz_developer" {
 
 # Create an IAM policy document allowing IAM Principal to authenticate to Kubernetes cluster
 resource "aws_iam_policy" "eks_admin_policy" {
-  name        = "${var.project_name}-${var.env}-eks-admin-policy"
+  name        = "${var.project_name}-${var.env}-karpenter-eks-admin-policy"
   description = "Policy allowing IAM principals to authenticate to the EKS cluster"
 
   policy = jsonencode({
