@@ -272,9 +272,9 @@ module "eks" {
       instance_types = ["g4dn.xlarge"]
       capacity_type  = "ON_DEMAND"
 
-      min_size     = 3
-      max_size     = 3
-      desired_size = 3
+      min_size     = 2
+      max_size     = 2
+      desired_size = 2
 
       enable_monitoring = true
       ebs_optimized     = true
