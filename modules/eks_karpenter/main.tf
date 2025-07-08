@@ -91,22 +91,27 @@ module "eks" {
   # Fargate profile for system workloads (optional)
   fargate_profiles = {
     system = {
-      name = "system"
+      name                   = "system"
+      pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
       selectors = [
         {
           namespace = "kube-system"
-          labels = {
-            k8s-app = "kube-dns"
-          }
-        },
-        {
-          namespace = "karpenter"
-          labels = {
-            "karpenter.sh/controller" = "true"
-          }
         },
         {
           namespace = "monitoring"
+        }
+      ]
+      tags = {
+        Environment = var.env
+        Terraform   = "true"
+      }
+    },
+    karpenter = {
+      name                   = "karpenter"
+      pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
+      selectors = [
+        {
+          namespace = "karpenter"
         }
       ]
       tags = {
