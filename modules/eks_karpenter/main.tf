@@ -83,26 +83,7 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   # Define node groups with appropriate configurations
-  eks_managed_node_groups = {
-    /*karpenter = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
-
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
-
-      labels = {
-        # Used to ensure Karpenter runs on nodes that it does not manage
-        "karpenter.sh/controller" = "true"
-      }
-      create_iam_role = true
-      iam_role_additional_policies = {
-        secrets_policy = aws_iam_policy.node_secrets_policy.arn,
-        ssm_policy     = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-      }
-    }*/
-  }
+  eks_managed_node_groups = {}
 
   # Enable logging for audit and troubleshooting
   cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
