@@ -105,7 +105,7 @@ module "eks" {
 }
 
 module "eks-karpenter" {
-  source = "./../../modules/eks"
+  source = "./../../modules/eks_karpenter"
 
   project_name    = var.project_name
   cluster_name    = var.cluster_name
@@ -157,7 +157,7 @@ module "eks-karpenter" {
   create_kubernetes_resources = true
 
   node_secrets_policy_metadata = {
-    name        = "${var.project_name}-${var.env}-node-secrets-access"
+    name        = "${var.project_name}-${var.env}-karpenter-node-secrets-access"
     description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
   }
 
