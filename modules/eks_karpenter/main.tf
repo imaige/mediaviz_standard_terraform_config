@@ -130,6 +130,29 @@ module "eks" {
 
 }
 
+resource "aws_iam_role" "fargate_pod_execution_role" {
+  name = "${var.project_name}-${var.env}-karpenter-fargate-pod-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "eks-fargate-pods.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "fargate_pod_execution_role_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+  role       = aws_iam_role.fargate_pod_execution_role.name
+}
+
+
 module "karpenter" {
 
   depends_on = [
@@ -144,11 +167,14 @@ module "karpenter" {
   irsa_oidc_provider_arn = module.eks.oidc_provider_arn
 
   irsa_namespace_service_accounts = ["karpenter:karpenter"]
+  enable_irsa                     = true
+  create_iam_role                 = true
   create_instance_profile         = true
+  create_node_iam_role            = true
+  enable_spot_termination         = true
   node_iam_role_additional_policies = {
     AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   }
-  enable_spot_termination = true
 }
 
 resource "helm_release" "karpenter" {
