@@ -73,11 +73,11 @@ module "eks" {
         }
       })
     }
-    aws-ebs-csi-driver = {
+    /*    aws-ebs-csi-driver = {
       most_recent              = true
       resolve_conflicts        = "OVERWRITE"
       service_account_role_arn = aws_iam_role.ebs_csi_role.arn
-    }
+    }*/
   }
 
   enable_cluster_creator_admin_permissions = true
@@ -546,7 +546,7 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 
 
 # Install NVIDIA Device Plugin for GPU support
-resource "helm_release" "nvidia_device_plugin" {
+/*resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
 
   name             = "nvdp"
@@ -573,7 +573,7 @@ resource "helm_release" "nvidia_device_plugin" {
 
   depends_on = [module.eks]
 }
-
+*/
 # Node IAM policy with least privilege
 resource "aws_iam_policy" "node_secrets_policy" {
   name        = var.node_secrets_policy_metadata["name"]
