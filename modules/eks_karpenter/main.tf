@@ -120,14 +120,16 @@ module "eks" {
       }
     },
     primary = {
-      name                   = "primary"
-      pod_execution_role_arn = aws_iam_role.primary_fargate_pod_execution_role.arn
-
+      name = "primary"
       selectors = [
         {
           namespace = "default"
         }
       ]
+      iam_role_additional_policies = {
+        node_basic_policy   = aws_iam_policy.node_basic_policy.arn
+        node_secrets_policy = aws_iam_policy.node_secrets_policy.arn
+      }
       tags = {
         Environment = var.env
         Terraform   = "true"
@@ -166,32 +168,7 @@ resource "aws_iam_role_policy_attachment" "fargate_pod_execution_role_policy" {
   role       = aws_iam_role.fargate_pod_execution_role.name
 }
 
-resource "aws_iam_role" "primary_fargate_pod_execution_role" {
-  name = "${var.project_name}-${var.env}-karpenter-primary-fargate-pod-execution-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "eks-fargate-pods.amazonaws.com"
-        }
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "primary_fargate_pod_execution_role_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
-  role       = aws_iam_role.primary_fargate_pod_execution_role.name
-}
-
-resource "aws_iam_role_policy_attachment" "primary_fargate_pod_secrets_policy" {
-  policy_arn = aws_iam_policy.node_secrets_policy.arn
-  role       = aws_iam_role.primary_fargate_pod_execution_role.name
-}
 
 module "karpenter" {
 
