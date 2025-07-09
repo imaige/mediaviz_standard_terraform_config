@@ -161,6 +161,9 @@ module "eks-karpenter" {
     description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
   }
 
+  # Generic KMS access that we should tighten up later
+  kms_key_access = true
+
   tags = var.tags
 }
 

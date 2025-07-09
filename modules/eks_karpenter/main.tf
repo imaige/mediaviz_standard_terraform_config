@@ -608,7 +608,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
         Resource = [
           "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-${var.env}*",
           "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:mediaviz-k8s-secrets",
-          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-serverless-${var.env}-aurora-credentials-pg"
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-serverless-${var.env}-aurora-credentials-pg*",
         ]
       }],
 
@@ -623,6 +623,15 @@ resource "aws_iam_policy" "node_secrets_policy" {
           "rds-data:RollbackTransaction"
         ]
         Resource = var.aurora_cluster_arns
+      }] : [],
+
+      # Generic KMS access that we should tighten up later
+      length(var.kms_key_access) > 0 ? [{
+        Effect = "Allow"
+        Action = [
+          "kms:*"
+        ]
+        Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*"
       }] : [],
 
       # KMS access - only include if kms_key_arns is not empty

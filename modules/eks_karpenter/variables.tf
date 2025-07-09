@@ -78,6 +78,12 @@ variable "kms_key_arns" {
   default     = []
 }
 
+variable "kms_key_access" {
+  description = "General access to KMS"
+  type        = string
+  default     = ""
+}
+
 variable "cloudwatch_logs_kms_key_arn" {
   description = "ARN of the KMS key for CloudWatch logs encryption"
   type        = string
