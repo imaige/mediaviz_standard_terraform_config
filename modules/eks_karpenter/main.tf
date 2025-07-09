@@ -91,8 +91,8 @@ module "eks" {
   # Fargate profile for system workloads (optional)
   fargate_profiles = {
     system = {
-      name                   = "system"
-      pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
+      name = "system"
+
       selectors = [
         {
           namespace = "kube-system"
@@ -107,8 +107,7 @@ module "eks" {
       }
     },
     karpenter = {
-      name                   = "karpenter"
-      pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
+      name = "karpenter"
       selectors = [
         {
           namespace = "karpenter"
@@ -129,6 +128,7 @@ module "eks" {
       iam_role_additional_policies = {
         node_basic_policy   = aws_iam_policy.node_basic_policy.arn
         node_secrets_policy = aws_iam_policy.node_secrets_policy.arn
+        ssm_policy          = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
       }
       tags = {
         Environment = var.env
@@ -167,7 +167,6 @@ resource "aws_iam_role_policy_attachment" "fargate_pod_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
   role       = aws_iam_role.fargate_pod_execution_role.name
 }
-
 
 
 module "karpenter" {
@@ -608,7 +607,8 @@ resource "aws_iam_policy" "node_secrets_policy" {
         ]
         Resource = [
           "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-${var.env}*",
-          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret/mediaviz-k8s-secrets"
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:mediaviz-k8s-secrets",
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-serverless-${var.env}-aurora-credentials-pg"
         ]
       }],
 
@@ -706,3 +706,51 @@ resource "aws_iam_policy" "node_basic_policy" {
 }
 
 data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "fargate_sa_role" {
+  name = "${var.project_name}-${var.env}-fargate-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${module.eks.oidc_provider}"
+      },
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Condition = {
+        StringEquals = {
+          "${module.eks.oidc_provider}:sub" : "system:serviceaccount:default:${var.project_name}-${var.env}-fargate-sa",
+          "${module.eks.oidc_provider}:aud" : "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+# Attach the existing policies to the new role
+resource "aws_iam_role_policy_attachment" "fargate_sa_node_basic_policy_attachment" {
+  role       = aws_iam_role.fargate_sa_role.name
+  policy_arn = aws_iam_policy.node_basic_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "fargate_sa_node_secrets_policy_attachment" {
+  role       = aws_iam_role.fargate_sa_role.name
+  policy_arn = aws_iam_policy.node_secrets_policy.arn
+}
+
+# Create the Kubernetes service account
+resource "kubernetes_service_account" "fargate_sa" {
+  metadata {
+    name      = "${var.project_name}-${var.env}-fargate-sa"
+    namespace = "default"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.fargate_sa_role.arn
+    }
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+}
