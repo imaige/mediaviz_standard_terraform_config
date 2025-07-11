@@ -2,8 +2,9 @@
 module "vpc" {
   source = "./../../modules/networking"
 
-  cluster_name = var.cluster_name
-  env          = var.env
+  karpenter_cluster_name = "${var.project_name}-${var.env}-karpenter"
+  cluster_name           = var.cluster_name
+  env                    = var.env
 
   tags = var.tags
 }
