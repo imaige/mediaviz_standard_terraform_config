@@ -229,7 +229,7 @@ variable "bastion_allowed_ips" {
 variable "evidence_gpu_instance_types" {
   description = "Instance types for the evidence model GPU node group"
   type        = list(string)
-  default     = ["g5.4xlarge"]
+  default     = ["g4dn.xlarge"]
 }
 
 variable "evidence_gpu_node_min_size" {

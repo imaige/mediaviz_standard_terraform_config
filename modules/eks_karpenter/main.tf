@@ -127,6 +127,9 @@ module "eks" {
       selectors = [
         {
           namespace = "default"
+          labels = {
+            "fargate.karpenter.sh/enabled" = true
+          }
         }
       ]
       iam_role_additional_policies = {
@@ -234,6 +237,138 @@ resource "helm_release" "karpenter" {
 # Karpenter NodePool and EC2NodeClasses to replace the EKS managed nodegroups
 # These are kubernetes custom resources
 
+resource "kubernetes_manifest" "karpenter_primary_ec2nodeclass" {
+  # Depends on the Karpenter Helm release being deployed
+  manifest = {
+    "apiVersion" = "karpenter.k8s.aws/v1"
+    "kind"       = "EC2NodeClass"
+    "metadata" = {
+      "name" = "karpenter-primary-node-class"
+      "annotations" = {
+        "kubernetes.io/description" = "Karpenter-managed EC2NodeClass for generic workloads"
+      }
+    }
+
+    spec = {
+      # For AL2023_x86_64_NVIDIA, the amiFamily is "AL2023".
+      amiFamily = "AL2023"
+
+      amiSelectorTerms = [{
+        name = "${var.primary_ami_selector}*"
+      }]
+
+      role = module.karpenter.node_iam_role_arn
+
+      # Security groups and Subnets are discovered via tags.
+      "securityGroupSelectorTerms" = [{
+        tags = {
+          "karpenter.sh/discovery" = module.eks.cluster_name
+        }
+      }]
+      "subnetSelectorTerms" = [{
+        tags = {
+          "karpenter.sh/discovery" = module.eks.cluster_name
+        }
+      }]
+
+      # EBS Block device
+      "blockDeviceMappings" = [{
+        "deviceName" = "/dev/xvda"
+        "ebs" = {
+          "volumeSize"          = "100Gi"
+          "volumeType"          = "gp3"
+          "iops"                = 3000
+          "throughput"          = 125
+          "encrypted"           = true
+          "kmsKeyId"            = var.kms_key_arn
+          "deleteOnTermination" = true
+        }
+      }]
+
+      # Tags to apply to the individual ec2 instances
+      "tags" = {
+        "Name"         = "${var.project_name}-${var.env}-karpenter-primary-node"
+        "NodeGroup"    = "primary"
+        "WorkloadType" = "general"
+        "Environment"  = var.env
+        "ManagedBy"    = "karpenter"
+      }
+    }
+  }
+}
+
+
+# NodePools define the Kubernetes-level requirements for the nodes
+resource "kubernetes_manifest" "karpenter_primary_nodepool" {
+
+  depends_on = [
+    helm_release.karpenter
+  ]
+  manifest = {
+    "apiVersion" = "karpenter.sh/v1"
+    "kind"       = "NodePool"
+    "metadata" = {
+      "name" = "karpenter-primary-nodepool"
+    }
+    "spec" = {
+      "limits" = {
+        "cpu"    = var.primary_nodepool_max_cpu
+        "memory" = var.primary_nodepool_max_mem
+      }
+      "disruption" = {
+        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
+        "consolidateAfter"    = "720h"
+      }
+      "template" = {
+        "metadata" = {
+          "labels" = {
+            "karpenter-managed" = "true"
+            "workload-type"     = "primary"
+          }
+        }
+        "spec" = {
+          "nodeClassRef" = {
+            "group" = "karpenter.k8s.aws"
+            "kind"  = "EC2NodeClass"
+            "name"  = "karpenter-primary-node-class"
+          }
+          "requirements" = [
+            {
+              "key"      = "workload-type"
+              "operator" = "In"
+              "values"   = ["primary"]
+            },
+            {
+              "key"      = "node.kubernetes.io/instance-type"
+              "operator" = "In"
+              "values"   = var.primary_nodepool_instance_types
+            },
+            {
+              "key"      = "kubernetes.io/arch"
+              "operator" = "In"
+              "values" = [
+                "amd64",
+              ]
+            },
+            {
+              "key"      = "kubernetes.io/os"
+              "operator" = "In"
+              "values" = [
+                "linux",
+              ]
+            },
+            {
+              "key"      = "karpenter.sh/capacity-type"
+              "operator" = "In"
+              "values"   = var.primary_nodepool_capacity_type
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+
 resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
   # Depends on the Karpenter Helm release being deployed
   manifest = {
@@ -284,7 +419,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
 
       # Tags to apply to the individual ec2 instances
       "tags" = {
-        "Name"         = "${var.project_name}-${var.env}-high-power-gpu-node"
+        "Name"         = "${var.project_name}-${var.env}-karpenter-high-power-gpu-node"
         "NodeGroup"    = "high-power-gpu"
         "WorkloadType" = "evidence-model"
         "GpuType"      = "nvidia-a10g"
@@ -318,6 +453,11 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
         "consolidateAfter"    = "720h"
       }
       "template" = {
+        "metadata" = {
+          "labels" = {
+            "karpenter-managed" = "true"
+          }
+        }
         "spec" = {
           "nodeClassRef" = {
             "group" = "karpenter.k8s.aws"
@@ -332,6 +472,11 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
             }
           ]
           "requirements" = [
+            {
+              "key"      = "workload-type"
+              "operator" = "In"
+              "values"   = ["high-power"]
+            },
             {
               "key"      = "node.kubernetes.io/instance-type"
               "operator" = "In"
@@ -356,13 +501,12 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
               "operator" = "In"
               "values"   = var.evidence_gpu_nodepool_capacity_type
             },
-          ]
-          "taints" = [
             {
-              "effect" = "NoSchedule"
-              "key"    = "nvidia.com/gpu"
-              "value"  = "true"
+              "key"      = "nvidia.com/gpu"
+              "operator" = "In"
+              "values"   = ["true"]
             },
+
           ]
         }
       }
@@ -448,7 +592,7 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 
 
 # Install NVIDIA Device Plugin for GPU support
-/*resource "helm_release" "nvidia_device_plugin" {
+resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
 
   name             = "nvdp"
@@ -475,7 +619,7 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 
   depends_on = [module.eks]
 }
-*/
+
 # Node IAM policy with least privilege
 resource "aws_iam_policy" "node_secrets_policy" {
   name        = var.node_secrets_policy_metadata["name"]

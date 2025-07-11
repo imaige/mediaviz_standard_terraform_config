@@ -299,11 +299,23 @@ variable "shared_account_id" {
 variable "models" {
   description = "The models being deployed to Kubernetes"
   type        = map(any)
-  default     = { "evidence-model" = { needs_sqs = true } }
+  default     = { "evidence-model" = { needs_sqs = true }, "external-api" = { needs_sqs = true } }
 }
 
 variable "evidence_gpu_ami_selector" {
   description = "The ami for the high-power GPU nodeclass"
   type        = string
   default     = "amazon-eks-node-al2023-x86_64-nvidia"
+}
+
+variable "primary_ami_selector" {
+  description = "The ami for the high-power GPU nodeclass"
+  type        = string
+  default     = "amazon-eks-node-al2023"
+}
+
+variable "primary_nodepool_instance_types" {
+  description = "The instance types for the primary nodepool"
+  type        = list(string)
+  default     = ["t3.medium", "t3.micro"]
 }

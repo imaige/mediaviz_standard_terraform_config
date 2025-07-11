@@ -169,6 +169,10 @@ module "eks-karpenter" {
       short_name = "evidence-model"
       needs_sqs  = true
     }
+    "external-api" = {
+      short_name = "external-api"
+      needs_sqs  = true
+    }
   }
 
   # Generic KMS access that we should tighten up later
