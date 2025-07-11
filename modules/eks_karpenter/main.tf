@@ -15,6 +15,10 @@ module "eks" {
   cluster_endpoint_private_access = true
   enable_irsa                     = true
 
+  cluster_tags = {
+    "karpenter.sh/discovery" = "${var.project_name}-${var.env}-karpenter"
+  }
+
   # Authentication configuration
   authentication_mode = "API"
 
@@ -242,15 +246,15 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
       }
     }
 
-    "spec" = {
+    spec = {
       # For AL2023_x86_64_NVIDIA, the amiFamily is "AL2023".
-      "amiFamily" = "AL2023"
+      amiFamily = "AL2023"
 
       amiSelectorTerms = [{
-        name = "AL2023_x86_64_NVIDIA"
+        name = "${var.evidence_gpu_ami_selector}*"
       }]
 
-      "role" = module.karpenter.node_iam_role_arn
+      role = module.karpenter.node_iam_role_arn
 
       # Security groups and Subnets are discovered via tags.
       "securityGroupSelectorTerms" = [{

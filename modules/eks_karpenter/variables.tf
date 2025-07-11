@@ -301,3 +301,9 @@ variable "models" {
   type        = map(any)
   default     = { "evidence-model" = { needs_sqs = true } }
 }
+
+variable "evidence_gpu_ami_selector" {
+  description = "The ami for the high-power GPU nodeclass"
+  type        = string
+  default     = "amazon-eks-node-al2023-x86_64-nvidia"
+}
