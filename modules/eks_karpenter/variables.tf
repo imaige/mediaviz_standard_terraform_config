@@ -291,3 +291,13 @@ variable "node_secrets_policy_metadata" {
   description = "name and description of the eks node policy"
 }
 
+variable "shared_account_id" {
+  description = "AWS account ID of the shared services account"
+  type        = string
+}
+
+variable "models" {
+  description = "The models being deployed to Kubernetes"
+  type        = map(any)
+  default     = { "evidence-model" = { needs_sqs = true } }
+}

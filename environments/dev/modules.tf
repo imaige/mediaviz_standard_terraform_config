@@ -148,6 +148,7 @@ module "eks-karpenter" {
 
   # Cross account access
   enable_shared_access   = true
+  shared_account_id      = data.terraform_remote_state.shared.outputs.account_id
   shared_access_role_arn = module.cross_account_roles.role_arn
 
   # Enable developer role for MediavizDevelopers group
@@ -159,6 +160,15 @@ module "eks-karpenter" {
   node_secrets_policy_metadata = {
     name        = "${var.project_name}-${var.env}-karpenter-node-secrets-access"
     description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
+  }
+
+  # Models map
+
+  models = {
+    "evidence-model" = {
+      short_name = "evidence-model"
+      needs_sqs  = true
+    }
   }
 
   # Generic KMS access that we should tighten up later

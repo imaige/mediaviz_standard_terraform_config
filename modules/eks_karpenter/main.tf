@@ -646,7 +646,150 @@ resource "kubernetes_service_account" "fargate_sa" {
   }
 }
 
+# IAM roles and policies and Service Accounts for the individual models
+resource "kubernetes_service_account" "model_sa" {
+  for_each = var.models
+  metadata {
+    name      = "${each.key}-karpenter-sa"
+    namespace = "default"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.model_role[each.key].arn
+    }
+  }
 
+  depends_on = [
+    aws_iam_role_policy_attachment.model_policy_attach
+  ]
+}
+
+
+resource "aws_iam_role" "model_role" {
+  for_each = var.models
+
+  name = "${var.project_name}-${var.env}-eks-${each.key}-karpenter-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        },
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:${each.key}",
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "model_policy" {
+  for_each = var.models
+
+  name = "${var.project_name}-${var.env}-eks-${each.key}-karpenter-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat(
+      # Cross-account ECR access
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage",
+            "ecr:BatchCheckLayerAvailability"
+          ]
+          Resource = [
+            "arn:aws:ecr:${var.aws_region}:${var.shared_account_id}:repository/${var.project_name}-shared-eks-*"
+          ]
+        },
+        {
+          Effect   = "Allow"
+          Action   = ["ecr:GetAuthorizationToken"]
+          Resource = ["*"]
+        }
+      ],
+      # SQS permissions - only for models that need it
+      # FIXME: Pin down what queues are needed
+      each.value.needs_sqs ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:SendMessage",
+            "sqs:ChangeMessageVisibility"
+          ]
+          Resource = [
+            "*"
+            #"arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${split("/", lookup(var.sqs_queues, each.key, ""))[4]}"
+          ]
+        }
+      ] : [],
+      # Other AWS service permissions
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "s3:*",
+            "s3:PutBucketCORS"
+          ]
+          Resource = "*"
+        }
+      ],
+      # Aurora Data API access - only include if aurora_cluster_arns is not empty
+      length(var.aurora_cluster_arns) > 0 ? [{
+        Effect = "Allow"
+        Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:CommitTransaction",
+          "rds-data:RollbackTransaction"
+        ]
+        Resource = var.aurora_cluster_arns
+      }] : [],
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret"
+          ]
+          Resource = [
+            "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-${var.env}*",
+            "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:mediaviz-k8s-secrets",
+            "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-serverless-${var.env}-aurora-credentials-pg*",
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt",
+            "kms:DescribeKey",
+            "kms:GenerateDataKey*"
+          ]
+          Resource = "*" # Changed from var.kms_key_arn to *
+        }
+      ]
+    )
+  })
+  tags = var.tags
+}
+
+
+resource "aws_iam_role_policy_attachment" "model_policy_attach" {
+  for_each   = var.models
+  role       = aws_iam_role.model_role[each.key].name
+  policy_arn = aws_iam_policy.model_policy[each.key].arn
+}
 
 # Manages the AWS Load Balancer Controller deployment
 
