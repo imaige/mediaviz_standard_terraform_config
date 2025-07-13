@@ -214,6 +214,23 @@ resource "helm_release" "karpenter" {
   wait    = true
   timeout = "900"
 
+  set {
+    name  = "controller.tolerations[1].key"
+    value = "eks.amazonaws.com/compute-type"
+  }
+  set {
+    name  = "controller.tolerations[1].operator"
+    value = "Equal"
+  }
+  set {
+    name  = "controller.tolerations[1].value"
+    value = "fargate"
+  }
+  set {
+    name  = "controller.tolerations[1].effect"
+    value = "NoSchedule"
+  }
+
   # Values passed to the Helm chart
   set {
     # Link the kubernetes service account to the IAM role
