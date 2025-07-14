@@ -2,7 +2,7 @@
 module "vpc" {
   source = "./../../modules/networking"
 
-  private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24"]
+  private_subnets = ["192.168.4.0/24", "192.168.5.0/24", "192.168.6.0/24", "192.168.7.0/24", "192.168.8.0/24", "192.168.9.0/24"]
 
   karpenter_cluster_name = "${var.project_name}-${var.env}-karpenter"
   cluster_name           = var.cluster_name

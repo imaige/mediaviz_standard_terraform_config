@@ -55,7 +55,7 @@ module "eks" {
       most_recent       = true
       resolve_conflicts = "OVERWRITE"
       configuration_values = jsonencode({
-        computeType = "Fargate"
+        computeType = "fargate"
       })
     }
     eks-pod-identity-agent = {
@@ -66,6 +66,7 @@ module "eks" {
       most_recent       = true
       resolve_conflicts = "OVERWRITE"
     }
+
     vpc-cni = {
       most_recent       = true
       resolve_conflicts = "OVERWRITE"
@@ -77,11 +78,11 @@ module "eks" {
         }
       })
     }
-    /*    aws-ebs-csi-driver = {
+    aws-ebs-csi-driver = {
       most_recent              = true
       resolve_conflicts        = "OVERWRITE"
       service_account_role_arn = aws_iam_role.ebs_csi_role.arn
-    }*/
+    }
   }
 
   enable_cluster_creator_admin_permissions = true
@@ -187,8 +188,8 @@ module "karpenter" {
 
   cluster_name = module.eks.cluster_name
 
-  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
-
+  irsa_oidc_provider_arn          = module.eks.oidc_provider_arn
+  enable_v1_permissions           = true
   irsa_namespace_service_accounts = ["karpenter:karpenter"]
   enable_irsa                     = true
   create_iam_role                 = true
@@ -609,6 +610,7 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 
 
 # Install NVIDIA Device Plugin for GPU support
+
 resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
 
