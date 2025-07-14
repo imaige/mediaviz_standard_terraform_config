@@ -173,6 +173,10 @@ module "eks-karpenter" {
       short_name = "external-api"
       needs_sqs  = true
     }
+    "personhood-model" = {
+      short_name = "personhood-model"
+      needs_sqs  = true
+    }
   }
 
   # Generic KMS access that we should tighten up later
