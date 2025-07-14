@@ -54,9 +54,6 @@ module "eks" {
     coredns = {
       most_recent       = true
       resolve_conflicts = "OVERWRITE"
-      configuration_values = jsonencode({
-        computeType = "fargate"
-      })
     }
     eks-pod-identity-agent = {
       most_recent       = true
@@ -95,22 +92,6 @@ module "eks" {
 
   # Fargate profile for system workloads (optional)
   fargate_profiles = {
-    system = {
-      name = "system"
-
-      selectors = [
-        {
-          namespace = "kube-system"
-        },
-        {
-          namespace = "monitoring"
-        }
-      ]
-      tags = {
-        Environment = var.env
-        Terraform   = "true"
-      }
-    },
     karpenter = {
       name = "karpenter"
       selectors = [
@@ -118,27 +99,6 @@ module "eks" {
           namespace = "karpenter"
         }
       ]
-      tags = {
-        Environment = var.env
-        Terraform   = "true"
-      }
-    },
-    primary = {
-      name = "primary"
-      selectors = [
-        {
-          namespace = "default"
-          labels = {
-            "fargate.karpenter.sh/enabled" = true
-          }
-        }
-      ]
-      iam_role_additional_policies = {
-        node_basic_policy   = aws_iam_policy.node_basic_policy.arn
-        node_secrets_policy = aws_iam_policy.node_secrets_policy.arn
-        ssm_policy          = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-        sqs_policy          = aws_iam_policy.node_sqs_policy.arn
-      }
       tags = {
         Environment = var.env
         Terraform   = "true"
