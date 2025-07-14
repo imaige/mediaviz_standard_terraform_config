@@ -166,16 +166,19 @@ module "eks-karpenter" {
 
   models = {
     "evidence-model" = {
-      short_name = "evidence-model"
-      needs_sqs  = true
+      short_name        = "evidence-model"
+      needs_sqs         = true
+      needs_rekognition = false
     }
     "external-api" = {
-      short_name = "external-api"
-      needs_sqs  = true
+      short_name        = "external-api"
+      needs_sqs         = true
+      needs_rekognition = false
     }
     "personhood-model" = {
-      short_name = "personhood-model"
-      needs_sqs  = true
+      short_name        = "personhood-model"
+      needs_sqs         = true
+      needs_rekognition = true
     }
   }
 

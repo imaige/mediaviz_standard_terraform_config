@@ -866,6 +866,32 @@ resource "aws_iam_policy" "model_policy" {
           Resource = ["*"]
         }
       ],
+
+      # Rekognition, for those models that need it
+      each.value.needs_rekognition ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "rekognition:CompareFaces",
+            "rekognition:DetectFaces",
+            "rekognition:DetectLabels",
+            "rekognition:DetectModerationLabels",
+            "rekognition:DetectText",
+            "rekognition:GetCelebrityInfo",
+            "rekognition:RecognizeCelebrities",
+            "rekognition:ListCollections",
+            "rekognition:ListFaces",
+            "rekognition:SearchFaces",
+            "rekognition:SearchFacesByImage",
+            "rekognition:CreateCollection",
+            "rekognition:DeleteCollection",
+            "rekognition:IndexFaces",
+            "rekognition:DeleteFaces"
+          ]
+          Resource = ["*"]
+        }
+      ] : [],
+
       # SQS permissions - only for models that need it
       # FIXME: Pin down what queues are needed
       each.value.needs_sqs ? [
