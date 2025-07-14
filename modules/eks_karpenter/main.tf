@@ -137,6 +137,7 @@ module "eks" {
         node_basic_policy   = aws_iam_policy.node_basic_policy.arn
         node_secrets_policy = aws_iam_policy.node_secrets_policy.arn
         ssm_policy          = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        sqs_policy          = aws_iam_policy.node_sqs_policy.arn
       }
       tags = {
         Environment = var.env
@@ -741,6 +742,29 @@ resource "kubernetes_service_account" "shared_resources_sa" {
     }
   }
 }
+
+resource "aws_iam_policy" "node_sqs_policy" {
+  name        = "${var.project_name}-${var.env}-karpenter-node-sqs-policy"
+  description = "Policy for Fargate EKS nodes to access SQS queues"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:GetQueueUrl",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = var.sqs_queue_arns
+      }
+    ]
+  })
+}
+
 
 resource "aws_iam_policy" "node_basic_policy" {
   name        = "${var.project_name}-${var.env}-karpenter-node-basic-policy"
