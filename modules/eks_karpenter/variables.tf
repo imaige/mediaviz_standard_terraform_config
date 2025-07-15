@@ -317,7 +317,7 @@ variable "shared_account_id" {
 variable "models" {
   description = "The models being deployed to Kubernetes"
   type        = map(any)
-  default     = { "evidence-model" = { needs_sqs = true }, "external-api" = { needs_sqs = true } }
+  default     = {}
 }
 
 variable "evidence_gpu_ami_selector" {

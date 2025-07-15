@@ -181,6 +181,11 @@ module "eks-karpenter" {
       needs_sqs         = true
       needs_rekognition = true
     }
+    "feature-extraction-model" = {
+      short_name        = "feature-extraction-model"
+      needs_sqs         = true
+      needs_rekognition = false
+    }
   }
 
   # Generic KMS access that we should tighten up later
