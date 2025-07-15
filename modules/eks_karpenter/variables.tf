@@ -345,7 +345,7 @@ variable "primary_nodepool_instance_types" {
 }
 
 variable "gpu_nodepool_instance_types" {
-  description = "Instance type for the EKS node group"
+  description = "The instance types for the gpu nodepool"
   type        = list(string)
-  default     = ["t3.small", "t3.medium"]
+  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
 }

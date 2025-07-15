@@ -123,11 +123,11 @@ module "eks-karpenter" {
   primary_nodepool_capacity_type  = var.primary_nodepool_capacity_type
 
   # Use GPU instance types variable
-  gpu_instance_types         = var.gpu_instance_types
-  gpu_nodepool_max_cpu       = var.gpu_nodepool_max_cpu
-  gpu_nodepool_max_mem       = var.gpu_nodepool_max_mem
-  gpu_nodepool_capacity_type = var.gpu_nodepool_capacity_type
-  gpu_ami_selector           = var.gpu_ami_selector
+  gpu_nodepool_instance_types = var.gpu_instance_types
+  gpu_nodepool_max_cpu        = var.gpu_nodepool_max_cpu
+  gpu_nodepool_max_mem        = var.gpu_nodepool_max_mem
+  gpu_nodepool_capacity_type  = var.gpu_nodepool_capacity_type
+  gpu_ami_selector            = var.gpu_ami_selector
 
   # Evidence model dedicated GPU nodes
   evidence_gpu_instance_types         = var.evidence_gpu_instance_types
@@ -183,6 +183,11 @@ module "eks-karpenter" {
     }
     "feature-extraction-model" = {
       short_name        = "feature-extraction-model"
+      needs_sqs         = true
+      needs_rekognition = false
+    }
+    "similarity-model" = {
+      short_name        = "similarity-model"
       needs_sqs         = true
       needs_rekognition = false
     }
