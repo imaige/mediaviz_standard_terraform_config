@@ -191,6 +191,11 @@ module "eks-karpenter" {
       needs_sqs         = true
       needs_rekognition = false
     }
+    "similarity-set-sorting" = {
+      short_name        = "similarity-set-sorting"
+      needs_sqs         = true
+      needs_rekognition = false
+    }
   }
 
   # Generic KMS access that we should tighten up later
