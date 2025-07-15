@@ -305,12 +305,12 @@ module "eks-karpenter" {
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu = "1"
+          mem = "1Gi"
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu = "500m"
+          mem = "1024Mi"
         }
       }
       workload-type = "gpu"
