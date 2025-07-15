@@ -254,7 +254,7 @@ variable "nodegroup_version" {
 variable "evidence_gpu_nodepool_capacity_type" {
   description = "Capacity type for the evidence GPU node group"
   type        = list(string)
-  default     = ["on-demand"]
+  default     = ["spot", "on-demand"]
 }
 
 variable "evidence_gpu_nodepool_max_cpu" {
@@ -272,7 +272,7 @@ variable "evidence_gpu_nodepool_max_mem" {
 variable "primary_nodepool_capacity_type" {
   description = "Capacity type for the primary node group"
   type        = list(string)
-  default     = ["on-demand"]
+  default     = ["spot", "on-demand"]
 }
 
 variable "primary_nodepool_max_cpu" {
@@ -283,6 +283,24 @@ variable "primary_nodepool_max_cpu" {
 
 variable "primary_nodepool_max_mem" {
   description = "Maximum memory limit for primary nodes"
+  type        = string
+  default     = "256Gi"
+}
+
+variable "gpu_nodepool_capacity_type" {
+  description = "Capacity type for the GPU node group"
+  type        = list(string)
+  default     = ["spot", "on-demand"]
+}
+
+variable "gpu_nodepool_max_cpu" {
+  description = "Maximum CPU limit for gpu compute nodes"
+  type        = number
+  default     = 64
+}
+
+variable "gpu_nodepool_max_mem" {
+  description = "Maximum memory limit for gpu compute nodes"
   type        = string
   default     = "256Gi"
 }

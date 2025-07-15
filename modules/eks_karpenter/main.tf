@@ -687,6 +687,7 @@ resource "aws_iam_policy" "node_secrets_policy" {
   tags = var.tags
 }
 
+
 # Create service account for cross-account access if needed
 resource "kubernetes_service_account" "shared_resources_sa" {
   count = var.enable_shared_access && var.create_kubernetes_resources ? 1 : 0
