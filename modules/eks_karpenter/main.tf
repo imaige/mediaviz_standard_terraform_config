@@ -637,8 +637,8 @@ resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
   }
 }
 
-/*
-module "helm_release" "keda" {
+
+resource "helm_release" "keda" {
   namespace        = "keda"
   create_namespace = true
   name             = "keda"
@@ -668,7 +668,7 @@ module "helm_release" "keda" {
     value = "json"
   }
 }
-*/
+
 
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {
