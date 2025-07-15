@@ -320,3 +320,15 @@ variable "gpu_nodepool_max_mem" {
   type        = string
   default     = "256Gi"
 }
+
+variable "gpu_ami_selector" {
+  description = "The ami for the high-power GPU nodeclass"
+  type        = string
+  default     = "amazon-eks-node-al2023-x86_64-nvidia"
+}
+
+variable "gpu_nodepool_instance_types" {
+  description = "Instance type for the EKS node group"
+  type        = list(string)
+  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
+}

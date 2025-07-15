@@ -356,7 +356,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_ec2nodeclass" {
     "metadata" = {
       "name" = "karpenter-high-power-gpu-node-class"
       "annotations" = {
-        "kubernetes.io/description" = "Karpenter-managed EC2NodeClass for high-power GPU"
+        "kubernetes.io/description" = "Karpenter-managed EC2NodeClass for high-power GPU workloads"
       }
     }
 
@@ -493,7 +493,149 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
   }
 }
 
+resource "kubernetes_manifest" "karpenter_gpu_ec2nodeclass" {
+  # Depends on the Karpenter Helm release being deployed
+  manifest = {
+    "apiVersion" = "karpenter.k8s.aws/v1"
+    "kind"       = "EC2NodeClass"
+    "metadata" = {
+      "name" = "karpenter-gpu-node-class"
+      "annotations" = {
+        "kubernetes.io/description" = "Karpenter-managed EC2NodeClass for GPU workloads"
+      }
+    }
 
+    spec = {
+      # For AL2023_x86_64_NVIDIA, the amiFamily is "AL2023".
+      amiFamily = "AL2023"
+
+      amiSelectorTerms = [{
+        name = "${var.gpu_ami_selector}*"
+      }]
+
+      role = module.karpenter.node_iam_role_arn
+
+      # Security groups and Subnets are discovered via tags.
+      "securityGroupSelectorTerms" = [{
+        tags = {
+          "karpenter.sh/discovery" = module.eks.cluster_name
+        }
+      }]
+      "subnetSelectorTerms" = [{
+        tags = {
+          "karpenter.sh/discovery" = module.eks.cluster_name
+        }
+      }]
+
+      # EBS Block device
+      "blockDeviceMappings" = [{
+        "deviceName" = "/dev/xvda"
+        "ebs" = {
+          "volumeSize"          = "1000Gi"
+          "volumeType"          = "gp3"
+          "iops"                = 16000
+          "throughput"          = 1000
+          "encrypted"           = true
+          "kmsKeyId"            = var.kms_key_arn
+          "deleteOnTermination" = true
+        }
+      }]
+
+      # Tags to apply to the individual ec2 instances
+      "tags" = {
+        "Name"         = "${var.project_name}-${var.env}-karpenter-gpu-node"
+        "NodeGroup"    = "gpu"
+        "WorkloadType" = "gpu"
+        "Environment"  = var.env
+        "ManagedBy"    = "karpenter"
+      }
+    }
+  }
+}
+
+
+# NodePools define the Kubernetes-level requirements for the nodes
+resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
+
+  depends_on = [
+    helm_release.karpenter
+  ]
+  manifest = {
+    "apiVersion" = "karpenter.sh/v1"
+    "kind"       = "NodePool"
+    "metadata" = {
+      "name" = "karpenter-gpu-nodepool"
+    }
+    "spec" = {
+      "limits" = {
+        "cpu"    = var.gpu_nodepool_max_cpu
+        "memory" = var.gpu_nodepool_max_mem
+      }
+      "disruption" = {
+        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
+        "consolidateAfter"    = "720h"
+      }
+      "template" = {
+        "metadata" = {
+          "labels" = {
+            "karpenter-managed" = "true"
+          }
+        }
+        "spec" = {
+          "nodeClassRef" = {
+            "group" = "karpenter.k8s.aws"
+            "kind"  = "EC2NodeClass"
+            "name"  = "karpenter-gpu-node-class"
+          }
+          "taints" = [
+            {
+              "key"    = "nvidia.com/gpu"
+              "value"  = "true"
+              "effect" = "NoSchedule"
+            }
+          ]
+          "requirements" = [
+            {
+              "key"      = "workload-type"
+              "operator" = "In"
+              "values"   = ["gpu"]
+            },
+            {
+              "key"      = "node.kubernetes.io/instance-type"
+              "operator" = "In"
+              "values"   = var.gpu_nodepool_instance_types
+            },
+            {
+              "key"      = "kubernetes.io/arch"
+              "operator" = "In"
+              "values" = [
+                "amd64",
+              ]
+            },
+            {
+              "key"      = "kubernetes.io/os"
+              "operator" = "In"
+              "values" = [
+                "linux",
+              ]
+            },
+            {
+              "key"      = "karpenter.sh/capacity-type"
+              "operator" = "In"
+              "values"   = var.gpu_nodepool_capacity_type
+            },
+            {
+              "key"      = "nvidia.com/gpu"
+              "operator" = "In"
+              "values"   = ["true"]
+            },
+
+          ]
+        }
+      }
+    }
+  }
+}
 
 /*
 module "helm_release" "keda" {

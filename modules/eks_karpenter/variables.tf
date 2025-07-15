@@ -326,6 +326,12 @@ variable "evidence_gpu_ami_selector" {
   default     = "amazon-eks-node-al2023-x86_64-nvidia"
 }
 
+variable "gpu_ami_selector" {
+  description = "The ami for the high-power GPU nodeclass"
+  type        = string
+  default     = "amazon-eks-node-al2023-x86_64-nvidia"
+}
+
 variable "primary_ami_selector" {
   description = "The ami for the high-power GPU nodeclass"
   type        = string
@@ -336,4 +342,10 @@ variable "primary_nodepool_instance_types" {
   description = "The instance types for the primary nodepool"
   type        = list(string)
   default     = ["t3.medium", "t3.micro"]
+}
+
+variable "gpu_nodepool_instance_types" {
+  description = "Instance type for the EKS node group"
+  type        = list(string)
+  default     = ["t3.small", "t3.medium"]
 }

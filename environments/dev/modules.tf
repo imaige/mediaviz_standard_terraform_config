@@ -117,22 +117,23 @@ module "eks-karpenter" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
 
-  eks_primary_instance_type = var.eks_primary_instance_type
-  node_group_min_size       = var.node_group_min_size
-  node_group_max_size       = var.node_group_max_size
-  node_group_desired_size   = var.node_group_desired_size
+  primary_nodepool_instance_types = var.primary_nodepool_instance_types
+  primary_nodepool_max_cpu        = var.primary_nodepool_max_cpu
+  primary_nodepool_max_mem        = var.primary_nodepool_max_mem
+  primary_nodepool_capacity_type  = var.primary_nodepool_capacity_type
 
   # Use GPU instance types variable
-  gpu_instance_types    = var.gpu_instance_types
-  gpu_node_min_size     = var.gpu_node_min_size
-  gpu_node_max_size     = var.gpu_node_max_size
-  gpu_node_desired_size = var.gpu_node_desired_size
+  gpu_instance_types         = var.gpu_instance_types
+  gpu_nodepool_max_cpu       = var.gpu_nodepool_max_cpu
+  gpu_nodepool_max_mem       = var.gpu_nodepool_max_mem
+  gpu_nodepool_capacity_type = var.gpu_nodepool_capacity_type
+  gpu_ami_selector           = var.gpu_ami_selector
 
   # Evidence model dedicated GPU nodes
-  evidence_gpu_instance_types    = var.evidence_gpu_instance_types
-  evidence_gpu_node_min_size     = var.evidence_gpu_node_min_size
-  evidence_gpu_node_max_size     = var.evidence_gpu_node_max_size
-  evidence_gpu_node_desired_size = var.evidence_gpu_node_desired_size
+  evidence_gpu_instance_types         = var.evidence_gpu_instance_types
+  evidence_gpu_nodepool_max_cpu       = var.evidence_gpu_nodepool_max_cpu
+  evidence_gpu_nodepool_max_mem       = var.evidence_gpu_nodepool_max_mem
+  evidence_gpu_nodepool_capacity_type = var.evidence_gpu_nodepool_capacity_type
 
   aws_account_id     = data.aws_caller_identity.current.account_id
   kms_key_arn        = module.security.kms_key_arn
