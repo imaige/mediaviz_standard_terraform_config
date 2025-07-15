@@ -115,6 +115,14 @@ module "eks" {
 
 }
 
+locals {
+  # Filtered map for models that need Helm deployments
+  helm_models = {
+    for k, v in var.models : k => v if v.needs_helm
+  }
+}
+
+
 resource "aws_iam_role" "fargate_pod_execution_role" {
   name = "${var.project_name}-${var.env}-karpenter-fargate-pod-execution-role"
 
@@ -836,7 +844,7 @@ resource "kubernetes_service_account" "shared_resources_sa" {
 
   metadata {
     name      = "${var.project_name}-karpenter-shared-access"
-    namespace = "default"
+    namespace = var.namespace
     annotations = {
       "eks.amazonaws.com/role-arn" = var.shared_access_role_arn
     }
@@ -930,7 +938,7 @@ resource "aws_iam_role_policy_attachment" "fargate_sa_node_secrets_policy_attach
 resource "kubernetes_service_account" "fargate_sa" {
   metadata {
     name      = "${var.project_name}-${var.env}-fargate-sa"
-    namespace = "default"
+    namespace = var.namespace
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.fargate_sa_role.arn
     }
@@ -945,7 +953,7 @@ resource "kubernetes_service_account" "model_sa" {
   for_each = var.models
   metadata {
     name      = "${each.key}-karpenter-sa"
-    namespace = "default"
+    namespace = var.namespace
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.model_role[each.key].arn
     }
@@ -1432,4 +1440,145 @@ resource "helm_release" "aws_load_balancer_controller" {
     name  = "vpcId"
     value = var.vpc_id
   }
+}
+
+
+# Model deployments with Helm
+
+resource "helm_release" "model_deployments" {
+  for_each = local.helm_models
+
+  name      = each.value.short_name
+  namespace = var.namespace
+  chart     = "${path.module}/chart/models"
+
+  create_namespace = true
+  wait             = true
+  atomic           = true
+  timeout          = var.helm_timeout
+
+  # Use inline values instead of templatefile
+  set {
+    name  = "image.repository"
+    value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-serverless-${var.env}-eks-${each.key}"
+
+  }
+
+  set {
+    name  = "image.tag"
+    value = each.value.image_tag
+  }
+
+  set {
+    name  = "replicas"
+    value = each.value.replicas
+  }
+
+  set {
+    name  = "serviceAccountName"
+    value = kubernetes_service_account.model_sa[each.key].metadata[0].name
+  }
+
+  set {
+    name  = "serviceAccountRoleArn"
+    value = aws_iam_role.model_role[each.key].arn
+  }
+
+  set {
+    name  = "env.AWS_REGION"
+    value = var.aws_region
+  }
+
+  set {
+    name  = "env.ENVIRONMENT"
+    value = var.env
+  }
+
+  set {
+    name  = "env.MODEL_NAME"
+    value = each.key
+  }
+
+  set {
+    name  = "env.DB_CLUSTER_ARN"
+    value = var.aurora_cluster_arn
+  }
+
+  set {
+    name  = "env.DB_SECRET_ARN"
+    value = var.aurora_secret_arn
+  }
+
+  set {
+    name  = "env.DB_NAME"
+    value = var.aurora_database_name
+  }
+  # Conditionally set SQS URL if needed
+  dynamic "set" {
+    for_each = each.value.needs_sqs ? [1] : []
+    content {
+      name  = "env.SQS_QUEUE_URL"
+      value = lookup(var.sqs_queues, each.key, "")
+    }
+  }
+
+  # Resource limits
+  set {
+    name  = "resources.limits.cpu"
+    value = each.value.resources.limits.cpu
+  }
+
+  set {
+    name  = "resources.limits.memory"
+    value = each.value.resources.limits.mem
+  }
+
+  set {
+    name  = "resources.requests.cpu"
+    value = each.value.resources.requests.cpu
+  }
+
+  set {
+    name  = "resources.requests.memory"
+    value = each.value.resources.requests.mem
+  }
+
+  # GPU tolerations for GPU models
+  dynamic "set" {
+    for_each = each.value.needs_gpu ? [1] : []
+    content {
+      name  = "tolerations[0].key"
+      value = "nvidia.com/gpu"
+    }
+  }
+
+  dynamic "set" {
+    for_each = each.value.needs_gpu ? [1] : []
+    content {
+      name  = "tolerations[0].value"
+      value = "true"
+      type  = "string"
+    }
+  }
+
+  dynamic "set" {
+    for_each = each.value.needs_gpu ? [1] : []
+    content {
+      name  = "tolerations[0].effect"
+      value = "NoSchedule"
+    }
+  }
+
+  # If we've specified a workload-type nodeSelector, then use that
+  # Otherwise, default to the primary workload type
+  set {
+    name  = "nodeSelector.workload-type"
+    value = lookup(each.value, "workload-type", "primary")
+  }
+
+  set {
+    name  = "fullnameOverride"
+    value = "${each.value.short_name}-karpenter"
+  }
+
 }

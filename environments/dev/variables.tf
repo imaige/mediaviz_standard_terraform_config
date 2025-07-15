@@ -332,3 +332,15 @@ variable "gpu_nodepool_instance_types" {
   type        = list(string)
   default     = ["g4dn.xlarge", "g4dn.2xlarge"]
 }
+
+variable "namespace" {
+  description = "The namespace for our workloads"
+  type        = string
+  default     = "default"
+}
+
+variable "helm_timeout" {
+  description = "Timeout for Helm operations in seconds"
+  type        = number
+  default     = 300
+}

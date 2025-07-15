@@ -45,3 +45,8 @@ output "cluster_certificate_authority_data" {
   # Or if you need to access it differently based on your implementation:
   # value = aws_eks_cluster.this.certificate_authority[0].data
 }
+
+output "helm_releases" {
+  description = "Names of the deployed Helm releases"
+  value       = { for k, v in helm_release.model_deployments : k => v.name }
+}

@@ -112,10 +112,14 @@ module "eks-karpenter" {
   env             = var.env
   cluster_version = var.karpenter_cluster_version
   aws_region      = data.aws_region.current.name
+  namespace       = var.namespace
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
+
+  # Helm config
+  helm_timeout = var.helm_timeout
 
   primary_nodepool_instance_types = var.primary_nodepool_instance_types
   primary_nodepool_max_cpu        = var.primary_nodepool_max_cpu
@@ -163,6 +167,11 @@ module "eks-karpenter" {
     description = "Policy allowing EKS nodes to access all secrets, KMS, and SQS"
   }
 
+  # Aurora configurations
+  aurora_cluster_arn   = module.aurora.cluster_arn
+  aurora_secret_arn    = module.aurora.secret_arn
+  aurora_database_name = module.aurora.database_name
+
   # Models map
 
   models = {
@@ -170,32 +179,147 @@ module "eks-karpenter" {
       short_name        = "evidence-model"
       needs_sqs         = true
       needs_rekognition = false
+      needs_helm        = false
+      needs_gpu         = true
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "high-power"
     }
     "external-api" = {
       short_name        = "external-api"
       needs_sqs         = true
       needs_rekognition = false
+      needs_helm        = false
+      needs_gpu         = false
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "primary"
     }
     "personhood-model" = {
       short_name        = "personhood-model"
       needs_sqs         = true
       needs_rekognition = true
+      needs_helm        = false
+      needs_gpu         = false
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "primary"
     }
     "feature-extraction-model" = {
       short_name        = "feature-extraction-model"
       needs_sqs         = true
       needs_rekognition = false
+      needs_helm        = false
+      needs_gpu         = true
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "gpu"
     }
     "similarity-model" = {
       short_name        = "similarity-model"
       needs_sqs         = true
       needs_rekognition = false
+      needs_helm        = false
+      needs_gpu         = true
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "gpu"
     }
     "similarity-set-sorting" = {
       short_name        = "similarity-set-sorting"
       needs_sqs         = true
       needs_rekognition = false
+      needs_helm        = false
+      needs_gpu         = true
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "gpu"
     }
+    "image-classification-model" = {
+      short_name        = "image-classification-model"
+      needs_sqs         = true
+      needs_rekognition = false
+      needs_helm        = true
+      needs_gpu         = true
+      replicas          = 1
+      image_tag         = "latest"
+      resources = {
+        limits = {
+          cpu = "500m"
+          mem = "512Mi"
+        }
+        requests = {
+          cpu = "100m"
+          mem = "128Mi"
+        }
+      }
+      workload-type = "gpu"
+    }
+  }
+
+  sqs_queues = {
+    feature-extraction-model   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
+    image-classification-model = module.sqs.eks_queue_urls["eks-image-classification-model"]
   }
 
   # Generic KMS access that we should tighten up later

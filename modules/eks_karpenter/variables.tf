@@ -349,3 +349,33 @@ variable "gpu_nodepool_instance_types" {
   type        = list(string)
   default     = ["g4dn.xlarge", "g4dn.2xlarge"]
 }
+
+variable "helm_timeout" {
+  description = "Timeout for Helm operations in seconds"
+  type        = number
+  default     = 300
+}
+
+variable "sqs_queues" {
+  description = "Map of SQS queue URLs"
+  type        = map(string)
+  default     = {}
+}
+
+
+# Aurora
+variable "aurora_cluster_arn" {
+  description = "ARN of the Aurora cluster"
+  type        = string
+}
+
+variable "aurora_secret_arn" {
+  description = "ARN of the Aurora secret"
+  type        = string
+}
+
+variable "aurora_database_name" {
+  description = "Name of the Aurora database"
+  type        = string
+}
+

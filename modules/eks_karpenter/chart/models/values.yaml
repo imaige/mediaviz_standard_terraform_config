@@ -1,0 +1,30 @@
+# values.yaml
+repository: ""
+tag: ""
+replicas: ""
+serviceAccount:
+  create: false
+serviceAccountName: ""
+serviceAccountRoleArn: ""
+
+# Environment variables
+env:
+  AWS_REGION: ""
+  ENVIRONMENT: ""
+  MODEL_NAME: ""
+  DB_CLUSTER_ARN: ""
+  DB_SECRET_ARN: ""
+  DB_NAME: ""
+  
+# Resources
+resources:
+  limits:
+    cpu: ""
+    memory: ""
+  requests:
+    cpu: ""
+    memory: ""
+
+tolerations: []
+fullnameOverride: ""
+
