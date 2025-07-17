@@ -1677,6 +1677,22 @@ resource "helm_release" "model_deployments" {
     }
   }
 
+  dynamic "set" {
+    for_each = contains(["evidence-model"], each.key) ? [1] : []
+    content {
+      name  = "SIMILARITY_SET_SORTING_SERVICE_QUEUE_URL"
+      value = true
+    }
+  }
+
+  dynamic "set" {
+    for_each = contains(["similarity-set-sorting-service"], each.key) ? [1] : []
+    content {
+      name  = "env.SQS_QUEUE_URL"
+      value = "https://sqs.us-east-2.amazonaws.com/379283424934/mediaviz-dev-eks-similarity-set-sorting-service-queue"
+    }
+  }
+
   # If we need a GPU, we should also request one
   /*
   dynamic "set" {

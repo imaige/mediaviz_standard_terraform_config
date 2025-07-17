@@ -37,6 +37,14 @@ spec:
                 secretKeyRef:
                   name: mediaviz-k8s-secrets
                   key: SIMILARITY_SORTING_SERVICE_URL
+            {{- with .Values.SIMILARITY_SET_SORTING_SERVICE_QUEUE_URL}}
+            - name: SIMILARITY_SET_SORTING_SERVICE_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mediaviz-k8s-secrets
+                  key: SIMILARITY_SET_SORTING_SERVICE_QUEUE_URL
+            {{- end }}
+
             {{- with .Values.SIMILARITY_QUEUE_URL}}
             - name: SIMILARITY_QUEUE_URL
               valueFrom:
