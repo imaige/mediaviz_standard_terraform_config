@@ -491,7 +491,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
               "values"   = var.evidence_gpu_nodepool_capacity_type
             },
             {
-              "key"      = "nvidia.com/gpu"
+              "key"      = "nvidia.com/gpu.present"
               "operator" = "In"
               "values"   = ["true"]
             },
@@ -634,11 +634,10 @@ resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
               "values"   = var.gpu_nodepool_capacity_type
             },
             {
-              "key"      = "nvidia.com/gpu"
+              "key"      = "nvidia.com/gpu.present"
               "operator" = "In"
               "values"   = ["true"]
             },
-
           ]
         }
       }
@@ -726,24 +725,24 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 resource "helm_release" "nvidia_device_plugin" {
   count = var.install_nvidia_plugin ? 1 : 0
 
-  name             = "nvdp"
+  name             = "nvidia-device-plugin"
   repository       = "https://nvidia.github.io/k8s-device-plugin"
   chart            = "nvidia-device-plugin"
   version          = var.nvidia_plugin_version
-  namespace        = "nvidia-device-plugin"
-  create_namespace = true
+  namespace        = "kube-system"
+  create_namespace = false
 
   values = [
     yamlencode({
       gfd = {
-        enabled = "true" # Changed from boolean to string
+        enabled = true
       },
       migStrategy        = "none",
-      failOnInitError    = "true", # Changed from boolean to string
+      failOnInitError    = true,
       deviceListStrategy = "envvar",
       deviceIDStrategy   = "uuid",
       nfd = {
-        enabled = "true" # Changed from boolean to string
+        enabled = true
       }
     })
   ]
