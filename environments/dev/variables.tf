@@ -268,6 +268,12 @@ variable "evidence_gpu_nodepool_capacity_type" {
   default     = ["spot", "on-demand"]
 }
 
+variable "evidence_gpu_ami_selector" {
+  description = "The ami for the high-power GPU nodeclass"
+  type        = string
+  default     = "amazon-eks-node-al2023-x86_64-nvidia"
+}
+
 # Primary node group
 
 # This is the old nodepool
@@ -322,7 +328,7 @@ variable "gpu_nodepool_max_mem" {
 }
 
 variable "gpu_ami_selector" {
-  description = "The ami for the high-power GPU nodeclass"
+  description = "The ami for the GPU nodeclass"
   type        = string
   default     = "amazon-eks-node-al2023-x86_64-nvidia"
 }
@@ -342,5 +348,17 @@ variable "namespace" {
 variable "helm_timeout" {
   description = "Timeout for Helm operations in seconds"
   type        = number
-  default     = 300
+  default     = 600
+}
+
+variable "log_level" {
+  description = "The logging level for the containers"
+  type        = string
+  default     = "TRACE"
+}
+
+variable "nvidia_plugin_version" {
+  description = "Version of the NVIDIA device plugin Helm chart"
+  type        = string
+  default     = "0.17.2"
 }

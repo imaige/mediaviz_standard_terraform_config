@@ -37,3 +37,18 @@ output "database_name" {
   description = "Name of the default database"
   value       = aws_rds_cluster.aurora.database_name
 }
+
+output "secret_name" {
+  description = "Name of the Secrets Manager Secret"
+  value       = aws_secretsmanager_secret.aurora.name
+}
+
+output "ro_hostname" {
+  description = "Hostname of the RO endpoint"
+  value       = aws_rds_cluster.aurora.reader_endpoint
+}
+
+output "rw_hostname" {
+  description = "Hostname of the RW endpoint"
+  value       = aws_rds_cluster.aurora.endpoint
+}
