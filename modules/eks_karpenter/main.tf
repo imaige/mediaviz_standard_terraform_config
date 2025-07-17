@@ -1693,7 +1693,7 @@ resource "helm_release" "model_deployments" {
   }
 
   # If we need a GPU, we should also request one
-  /*
+
   dynamic "set" {
     for_each = each.value.needs_gpu ? [1] : []
     content {
@@ -1709,7 +1709,7 @@ resource "helm_release" "model_deployments" {
       value = tostring(lookup(each.value, "gpus_requested", "1"))
     }
   }
-*/
+
   # If we've specified a workload-type nodeSelector, then use that
   # Otherwise, default to the primary workload type
   set {
