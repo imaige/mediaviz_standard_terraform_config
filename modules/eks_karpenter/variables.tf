@@ -316,7 +316,6 @@ variable "shared_account_id" {
 
 variable "models" {
   description = "The models being deployed to Kubernetes"
-  type        = map(any)
   default     = {}
 }
 
@@ -333,7 +332,7 @@ variable "gpu_ami_selector" {
 }
 
 variable "primary_ami_selector" {
-  description = "The ami for the high-power GPU nodeclass"
+  description = "The ami for the primary nodeclass"
   type        = string
   default     = "amazon-eks-node-al2023"
 }
@@ -379,3 +378,22 @@ variable "aurora_database_name" {
   type        = string
 }
 
+variable "aurora_secret_name" {
+  description = "The name of the Aurora secret"
+  type        = string
+}
+
+variable "aurora_ro_hostname" {
+  description = "The hostname for the Aurora read-only endpoint"
+  type        = string
+}
+
+variable "aurora_rw_hostname" {
+  description = "The hostname for the Aurora read-only endpoint"
+  type        = string
+}
+
+variable "log_level" {
+  description = "The logging level inside the container"
+  type        = string
+}

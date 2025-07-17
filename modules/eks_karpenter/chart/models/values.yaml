@@ -15,6 +15,9 @@ env:
   DB_CLUSTER_ARN: ""
   DB_SECRET_ARN: ""
   DB_NAME: ""
+  DB_KEYS_NAME: ""
+  LOG_LEVEL: INFO
+  GRPC_SERVER_PORT: 0.0.0.0:50051
   
 # Resources
 resources:
@@ -28,3 +31,8 @@ resources:
 tolerations: []
 fullnameOverride: ""
 
+SIMILARITY_QUEUE_URL:
+EVIDENCE_QUEUE_URL:
+PERSONHOOD_QUEUE_URL:
+FRONTEND_URL:
+SECRET_KEY:

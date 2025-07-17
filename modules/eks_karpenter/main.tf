@@ -120,6 +120,8 @@ locals {
   helm_models = {
     for k, v in var.models : k => v if v.needs_helm
   }
+
+  similarity_set_sorting_service_url = data.kubernetes_secret.secrets.data["SIMILARITY_SORTING_SERVICE_URL"]
 }
 
 
@@ -493,7 +495,6 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
               "operator" = "In"
               "values"   = ["true"]
             },
-
           ]
         }
       }
@@ -723,7 +724,7 @@ resource "aws_cloudwatch_log_group" "eks_logs_karpenter" {
 # Install NVIDIA Device Plugin for GPU support
 
 resource "helm_release" "nvidia_device_plugin" {
-  count = var.install_nvidia_plugin && var.create_kubernetes_resources ? 1 : 0
+  count = var.install_nvidia_plugin ? 1 : 0
 
   name             = "nvdp"
   repository       = "https://nvidia.github.io/k8s-device-plugin"
@@ -1442,6 +1443,14 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 }
 
+# k8s secrets
+
+data "kubernetes_secret" "secrets" {
+  metadata {
+    name      = "mediaviz-k8s-secrets"
+    namespace = "default"
+  }
+}
 
 # Model deployments with Helm
 
@@ -1460,13 +1469,12 @@ resource "helm_release" "model_deployments" {
   # Use inline values instead of templatefile
   set {
     name  = "image.repository"
-    value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-serverless-${var.env}-eks-${each.key}"
-
+    value = lookup(each.value, "image", "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-serverless-${var.env}-eks-${each.key}")
   }
 
   set {
     name  = "image.tag"
-    value = each.value.image_tag
+    value = lookup(each.value, "image_tag", "latest")
   }
 
   set {
@@ -1513,6 +1521,22 @@ resource "helm_release" "model_deployments" {
     name  = "env.DB_NAME"
     value = var.aurora_database_name
   }
+
+  set {
+    name  = "env.DB_KEYS_NAME"
+    value = var.aurora_secret_name
+  }
+
+  set {
+    name  = "env.DB_READ_HOST"
+    value = var.aurora_ro_hostname
+  }
+
+  set {
+    name  = "env.DB_WRITE_HOST"
+    value = var.aurora_rw_hostname
+  }
+
   # Conditionally set SQS URL if needed
   dynamic "set" {
     for_each = each.value.needs_sqs ? [1] : []
@@ -1521,6 +1545,17 @@ resource "helm_release" "model_deployments" {
       value = lookup(var.sqs_queues, each.key, "")
     }
   }
+
+  set {
+    name  = "env.LOG_LEVEL"
+    value = var.log_level
+  }
+
+  set {
+    name  = "env.GRPC_SERVER_PORT"
+    value = lookup(each.value, "grpc_server_port", "0.0.0.0:50051")
+  }
+
 
   # Resource limits
   set {
@@ -1569,6 +1604,97 @@ resource "helm_release" "model_deployments" {
     }
   }
 
+  # External API needs a number of additional environment variables
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "targetPort"
+      value = tostring("8000")
+    }
+  }
+
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "SECRET_KEY"
+      value = true
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "env.ACCESS_TOKEN_EXPIRE_MINUTES"
+      value = tostring(300)
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "env.REFRESH_TOKEN_EXPIRE_DAYS"
+      value = tostring(30)
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "FRONTEND_URL"
+      value = true
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "env.CORS_ALLOW_ORIGINS"
+      value = "*"
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "SIMILARITY_QUEUE_URL"
+      value = true
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "EVIDENCE_QUEUE_URL"
+      value = true
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "PERSONHOOD_QUEUE_URL"
+      value = true
+    }
+  }
+  dynamic "set" {
+    for_each = contains(["external-api"], each.key) ? [1] : []
+    content {
+      name  = "env.ALGORITHM"
+      value = "HS256"
+    }
+  }
+
+  # If we need a GPU, we should also request one
+  /*
+  dynamic "set" {
+    for_each = each.value.needs_gpu ? [1] : []
+    content {
+      name  = "resources.requests.nvidia\\.com/gpu"
+      value = tostring(lookup(each.value, "gpus_requested", "1"))
+    }
+  }
+
+  dynamic "set" {
+    for_each = each.value.needs_gpu ? [1] : []
+    content {
+      name  = "resources.limits.nvidia\\.com/gpu"
+      value = tostring(lookup(each.value, "gpus_requested", "1"))
+    }
+  }
+*/
   # If we've specified a workload-type nodeSelector, then use that
   # Otherwise, default to the primary workload type
   set {
@@ -1580,5 +1706,4 @@ resource "helm_release" "model_deployments" {
     name  = "fullnameOverride"
     value = "${each.value.short_name}-karpenter"
   }
-
 }
