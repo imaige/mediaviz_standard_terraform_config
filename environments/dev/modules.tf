@@ -332,6 +332,9 @@ module "eks-karpenter" {
   sqs_queues = {
     feature-extraction-model   = module.sqs.eks_queue_urls["eks-feature-extraction-model"]
     image-classification-model = module.sqs.eks_queue_urls["eks-image-classification-model"]
+    evidence-model             = module.sqs.eks_queue_urls["eks-evidence-model"]
+    personhood-model           = module.sqs.eks_queue_urls["eks-personhood-model"]
+    similarity-model           = module.sqs.eks_queue_urls["eks-similarity-model"]
   }
 
   # Generic KMS access that we should tighten up later
@@ -530,10 +533,15 @@ module "bastion" {
 }
 
 # Remove the ECR module in workload accounts - use shared account ECR instead
-# module "ecr" {
-#   source = "./../../modules/ecr"
-#   ...
-# }
+module "ecr" {
+  source = "./../../modules/ecr"
+
+  project_name = "${var.project_name}-serverless"
+  env          = var.env
+  kms_key_arn  = module.security.kms_key_arn
+
+  tags = var.tags
+}
 
 # This is just the updated part of your modules.tf file
 
