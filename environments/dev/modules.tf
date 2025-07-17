@@ -114,6 +114,8 @@ module "eks-karpenter" {
   aws_region      = data.aws_region.current.name
   namespace       = var.namespace
 
+  nvidia_plugin_version = var.nvidia_plugin_version
+
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
@@ -138,6 +140,7 @@ module "eks-karpenter" {
   evidence_gpu_nodepool_max_cpu       = var.evidence_gpu_nodepool_max_cpu
   evidence_gpu_nodepool_max_mem       = var.evidence_gpu_nodepool_max_mem
   evidence_gpu_nodepool_capacity_type = var.evidence_gpu_nodepool_capacity_type
+  evidence_gpu_ami_selector           = var.evidence_gpu_ami_selector
 
   aws_account_id     = data.aws_caller_identity.current.account_id
   kms_key_arn        = module.security.kms_key_arn
@@ -171,6 +174,11 @@ module "eks-karpenter" {
   aurora_cluster_arn   = module.aurora.cluster_arn
   aurora_secret_arn    = module.aurora.secret_arn
   aurora_database_name = module.aurora.database_name
+  aurora_secret_name   = module.aurora.secret_name
+  aurora_ro_hostname   = module.aurora.ro_hostname
+  aurora_rw_hostname   = module.aurora.rw_hostname
+
+  log_level = var.log_level
 
   # Models map
 
