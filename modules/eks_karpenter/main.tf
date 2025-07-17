@@ -1612,6 +1612,7 @@ resource "helm_release" "model_deployments" {
   }
 
   # GPU tolerations for GPU models
+  # Do we actually need this bit if we're setting requests/limits appropriately?
   dynamic "set" {
     for_each = each.value.needs_gpu ? [1] : []
     content {
