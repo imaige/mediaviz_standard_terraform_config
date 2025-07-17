@@ -193,12 +193,16 @@ module "eks-karpenter" {
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu     = "2"
+          storage = "8Gi"
+          mem     = "14Gi"
+          gpu     = 1
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu     = "500m"
+          storage = "6Gi"
+          mem     = "12Gi"
+          gpu     = 1
         }
       }
       workload-type = "high-power"
@@ -214,12 +218,12 @@ module "eks-karpenter" {
       port              = 8000
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu = "1"
+          mem = "1Gi"
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu = "500m"
+          mem = "1Gi"
         }
       }
       workload-type = "primary"
@@ -235,12 +239,14 @@ module "eks-karpenter" {
       image_tag = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu     = "3"
+          storage = "8Gi"
+          mem     = "6Gi"
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu     = "1"
+          storage = "6Gi"
+          mem     = "2Gi"
         }
       }
       workload-type = "primary"
@@ -255,12 +261,16 @@ module "eks-karpenter" {
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "1"
-          mem = "1Gi"
+          cpu     = "2"
+          storage = "8Gi"
+          mem     = "4Gi"
+          gpu     = 1
         }
         requests = {
-          cpu = "500m"
-          mem = "1024Mi"
+          cpu     = "500m"
+          storage = "6Gi"
+          mem     = "1024Mi"
+          gpu     = 1
         }
       }
       workload-type = "gpu"
@@ -275,12 +285,16 @@ module "eks-karpenter" {
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu     = "2"
+          storage = "8Gi"
+          mem     = "4Gi"
+          gpu     = 1
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu     = "500m"
+          storage = "6Gi"
+          mem     = "1Gi"
+          gpu     = 1
         }
       }
       workload-type = "gpu"
@@ -296,12 +310,14 @@ module "eks-karpenter" {
       image_tag = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu     = "2"
+          storage = "8Gi"
+          mem     = "4Gi"
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu     = "500m"
+          storage = "6Gi"
+          mem     = "1Gi"
         }
       }
       workload-type = "gpu"
@@ -316,12 +332,16 @@ module "eks-karpenter" {
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "1"
-          mem = "1Gi"
+          cpu     = "1"
+          storage = "1Gi"
+          mem     = "1Gi"
+          gpu     = 1
         }
         requests = {
-          cpu = "500m"
-          mem = "1024Mi"
+          cpu     = "1"
+          storage = "8i"
+          mem     = "1Gi"
+          gpu     = 1
         }
       }
       workload-type  = "gpu"

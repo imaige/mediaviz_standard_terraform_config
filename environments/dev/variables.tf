@@ -286,7 +286,7 @@ variable "eks_primary_instance_type" {
 variable "primary_nodepool_instance_types" {
   description = "Instance type for the EKS node group"
   type        = list(string)
-  default     = ["t3.small", "t3.medium"]
+  default     = ["t3.small", "t3.medium", "t3.large", "t3.xlarge"]
 }
 
 variable "primary_nodepool_capacity_type" {
@@ -298,13 +298,13 @@ variable "primary_nodepool_capacity_type" {
 variable "primary_nodepool_max_cpu" {
   description = "Maximum CPU limit for primary nodes"
   type        = number
-  default     = 2
+  default     = 4
 }
 
 variable "primary_nodepool_max_mem" {
   description = "Maximum memory limit for primary nodes"
   type        = string
-  default     = "2Gi"
+  default     = "8Gi"
 }
 
 # General CPU compute node group

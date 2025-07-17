@@ -1556,7 +1556,7 @@ resource "helm_release" "model_deployments" {
   }
 
 
-  # Resource limits
+  # Resource and limits
   set {
     name  = "resources.limits.cpu"
     value = each.value.resources.limits.cpu
@@ -1575,6 +1575,40 @@ resource "helm_release" "model_deployments" {
   set {
     name  = "resources.requests.memory"
     value = each.value.resources.requests.mem
+  }
+
+  # not every service requests or limits by storage
+  dynamic "set" {
+    for_each = can(each.value.resources.limits.storage) ? [1] : []
+    content {
+      name  = "resources.limits.ephemeral-storage"
+      value = each.value.resources.limits.storage
+    }
+  }
+
+  dynamic "set" {
+    for_each = can(each.value.resources.requests.storage) ? [1] : []
+    content {
+      name  = "resources.requests.ephemeral-storage"
+      value = each.value.resources.requests.storage
+    }
+  }
+
+  # not every service requests or limits by GPU
+  dynamic "set" {
+    for_each = can(each.value.resources.limits.gpu) ? [1] : []
+    content {
+      name  = "resources.limits.nvidia\\.com/gpu"
+      value = each.value.resources.limits.gpu
+    }
+  }
+
+  dynamic "set" {
+    for_each = can(each.value.resources.requests.gpu) ? [1] : []
+    content {
+      name  = "resources.requests.nvidia\\.com/gpu"
+      value = each.value.resources.requests.gpu
+    }
   }
 
   # GPU tolerations for GPU models
@@ -1692,24 +1726,6 @@ resource "helm_release" "model_deployments" {
     }
   }
 
-  # If we need a GPU, we should also request one
-
-  dynamic "set" {
-    for_each = each.value.needs_gpu ? [1] : []
-    content {
-      name  = "resources.requests.nvidia\\.com/gpu"
-      value = tostring(lookup(each.value, "gpus_requested", "1"))
-    }
-  }
-
-  dynamic "set" {
-    for_each = each.value.needs_gpu ? [1] : []
-    content {
-      name  = "resources.limits.nvidia\\.com/gpu"
-      value = tostring(lookup(each.value, "gpus_requested", "1"))
-    }
-  }
-
   # If we've specified a workload-type nodeSelector, then use that
   # Otherwise, default to the primary workload type
   set {
@@ -1722,3 +1738,4 @@ resource "helm_release" "model_deployments" {
     value = "${each.value.short_name}-karpenter"
   }
 }
+
