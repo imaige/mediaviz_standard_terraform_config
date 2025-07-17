@@ -187,7 +187,7 @@ module "eks-karpenter" {
       short_name        = "evidence-model"
       needs_sqs         = true
       needs_rekognition = false
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = true
       replicas          = 1
       image_tag         = "latest"
@@ -207,10 +207,11 @@ module "eks-karpenter" {
       short_name        = "external-api"
       needs_sqs         = true
       needs_rekognition = false
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = false
       replicas          = 1
       image_tag         = "latest"
+      port              = 8000
       resources = {
         limits = {
           cpu = "500m"
@@ -227,10 +228,11 @@ module "eks-karpenter" {
       short_name        = "personhood-model"
       needs_sqs         = true
       needs_rekognition = true
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = false
       replicas          = 1
-      image_tag         = "latest"
+      #image             = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-repository"
+      image_tag = "latest"
       resources = {
         limits = {
           cpu = "500m"
@@ -247,18 +249,18 @@ module "eks-karpenter" {
       short_name        = "feature-extraction-model"
       needs_sqs         = true
       needs_rekognition = false
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = true
       replicas          = 1
       image_tag         = "latest"
       resources = {
         limits = {
-          cpu = "500m"
-          mem = "512Mi"
+          cpu = "1"
+          mem = "1Gi"
         }
         requests = {
-          cpu = "100m"
-          mem = "128Mi"
+          cpu = "500m"
+          mem = "1024Mi"
         }
       }
       workload-type = "gpu"
@@ -267,7 +269,7 @@ module "eks-karpenter" {
       short_name        = "similarity-model"
       needs_sqs         = true
       needs_rekognition = false
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = true
       replicas          = 1
       image_tag         = "latest"
@@ -283,14 +285,15 @@ module "eks-karpenter" {
       }
       workload-type = "gpu"
     }
-    "similarity-set-sorting" = {
+    "similarity-set-sorting-service" = {
       short_name        = "similarity-set-sorting"
       needs_sqs         = true
       needs_rekognition = false
-      needs_helm        = false
+      needs_helm        = true
       needs_gpu         = true
       replicas          = 1
-      image_tag         = "latest"
+      #image             = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-repository"
+      image_tag = "latest"
       resources = {
         limits = {
           cpu = "500m"
@@ -321,7 +324,8 @@ module "eks-karpenter" {
           mem = "1024Mi"
         }
       }
-      workload-type = "gpu"
+      workload-type  = "gpu"
+      gpus_requested = "1"
     }
   }
 
