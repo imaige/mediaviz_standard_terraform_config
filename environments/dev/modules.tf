@@ -114,6 +114,14 @@ module "eks-karpenter" {
   aws_region      = data.aws_region.current.name
   namespace       = var.namespace
 
+  additional_access_entries = {
+    mediaviz_developers = {
+      kubernetes_groups = ["MediavizDevelopers"]
+      principal_arn     = "arn:aws:iam::379283424934:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_MediavizDevelopersPermissions_ef4e82822d944ece"
+      type              = "STANDARD"
+    }
+  }
+
   nvidia_plugin_version = var.nvidia_plugin_version
 
   vpc_id                   = module.vpc.vpc_id
