@@ -189,15 +189,52 @@ module "eks-karpenter" {
   log_level = var.log_level
 
   # Models map
-
   models = {
+    # MODEL MAP DEFINITION
+    # "model-name" = {                           <--- this is what most k8s resources are named after
+    #   short_name        = "similarity-model"   <--- we're not using this (yet)
+    #   needs_sqs         = true                 <--- Does this model need access to SQS?
+    #   needs_rekognition = false                <--- Does this model need access to Rekognition?
+    #   needs_helm        = true                 <--- Is this model deployed by Helm-via-Terraform?
+    #   needs_gpu         = true                 <--- Does this model need a GPU?  This sets a toleration of `nvidia.com/gpu:NoSchedule` see also resources.limits.gpu and resources.requests.gpu
+    #   replicas          = 0                    <--- How many replicas do we initially need?
+    #   image             = "repos/container"    <--- What container image do we pull from
+    #   image_tag         = "latest"             <--- The tag for the container
+    #   resources = {                            <--- Resources block
+    #     limits = {
+    #       cpu     = "2"                        <--- Max CPU usage (default: 1)
+    #       storage = "8Gi"                      <--- Max ephemeral storage (default: unset)
+    #       mem     = "4Gi"                      <--- Max memory usage (default: 2Gi)
+    #       gpu     = 1                          <--- Maximum number of GPUs we need (default: unset)
+    #     }
+    #     requests = {
+    #       cpu     = "500m"                     <--- CPUs to request (default: 500m)
+    #       storage = "6Gi"                      <--- Requested storage (default: unset)
+    #       mem     = "1Gi"                      <--- Requested memory (default: 1Gi)
+    #       gpu     = 1                          <--- Requested GPUs (default: unset)
+    #     }
+    #   }
+    #   workload-type = "gpu"                    <--- Sets the nodegroup type to run on. See the Karpenter nodepools template.metadata.labels.workload-type label. Default "primary"
+    #   keda_scalers = {                         <-- KEDA scaler definition block
+    #     time_scaler = {                        <-- Cron based scheduler
+    #       minReplicas      = 0                 <-- The absolute minimum number of pods to be deployed regardless of trigger
+    #       fallbackReplicas = 0                 <-- The number of pods to deploy outside the trigger. Overrides 'replicas' above
+    #       desiredReplicas  = 1                 <-- The number of pods to deploy inside the trigger
+    #       maxReplicas      = 3                 <-- The hard maximum number of pods to deploy
+    #       pollingInterval  = 30                <-- How frequently to poll the triggers
+    #       timezone         = "America/New_York"<-- Timezone for the schedule
+    #       start            = "45 12 * * 1-5"   <--- Start time for the trigger, in cron format
+    #       end              = "15 12 * * 1-5"   <--- trigger end time, in cron format
+    #     }
+    #   }
+    # }
     "evidence-model" = {
       short_name        = "evidence-model"
       needs_sqs         = true
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = true
-      replicas          = 1
+      replicas          = 0
       image_tag         = "latest"
       resources = {
         limits = {
@@ -214,6 +251,9 @@ module "eks-karpenter" {
         }
       }
       workload-type = "high-power"
+      keda_scalers = {
+        time_scaler = var.default_time_scaler
+      }
     }
     "external-api" = {
       short_name        = "external-api"
@@ -221,7 +261,7 @@ module "eks-karpenter" {
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = false
-      replicas          = 1
+      replicas          = 0
       image_tag         = "latest"
       port              = 8000
       resources = {
@@ -235,6 +275,9 @@ module "eks-karpenter" {
         }
       }
       workload-type = "primary"
+      keda_scalers = {
+        time_scaler = var.default_time_scaler
+      }
     }
     "personhood-model" = {
       short_name        = "personhood-model"
@@ -243,8 +286,7 @@ module "eks-karpenter" {
       needs_helm        = true
       needs_gpu         = false
       replicas          = 0
-      #image             = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-repository"
-      image_tag = "latest"
+      image_tag         = "latest"
       resources = {
         limits = {
           cpu     = "3"
@@ -259,15 +301,7 @@ module "eks-karpenter" {
       }
       workload-type = "primary"
       keda_scalers = {
-        time_scaler = {
-          minReplicas     = 1
-          desiredReplicas = 2
-          maxReplicas     = 5
-          pollingInterval = 30
-          timezone        = "America/Los_Angeles" # Pacific timezone
-          start           = "0 7 * * 1-5"         # 5am, Mon-Fri
-          end             = "0 16 * * 1-5"        # 7pm, Mon-Fri
-        }
+        time_scaler = var.default_time_scaler
       }
     }
     "feature-extraction-model" = {
@@ -276,7 +310,7 @@ module "eks-karpenter" {
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = true
-      replicas          = 1
+      replicas          = 0
       image_tag         = "latest"
       resources = {
         limits = {
@@ -293,6 +327,9 @@ module "eks-karpenter" {
         }
       }
       workload-type = "gpu"
+      keda_scalers = {
+        time_scaler = var.default_time_scaler
+      }
     }
     "similarity-model" = {
       short_name        = "similarity-model"
@@ -318,16 +355,7 @@ module "eks-karpenter" {
       }
       workload-type = "gpu"
       keda_scalers = {
-        time_scaler = {
-          minReplica       = 0
-          fallbackReplicas = 0
-          desiredReplicas  = 1
-          maxReplica       = 3
-          pollingInterval  = 30
-          timezone         = "America/New_York" # Eastern Timezone
-          start            = "45 12 * * 1-5"    # 1245pm, Mon-Fri
-          end              = "15 12 * * 1-5"    # 1215pm, Mon-Fri
-        }
+        time_scaler = var.default_time_scaler
       }
     }
     "similarity-set-sorting-service" = {
@@ -336,9 +364,8 @@ module "eks-karpenter" {
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = true
-      replicas          = 1
-      #image             = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-repository"
-      image_tag = "latest"
+      replicas          = 0
+      image_tag         = "latest"
       resources = {
         limits = {
           cpu     = "2"
@@ -352,6 +379,9 @@ module "eks-karpenter" {
         }
       }
       workload-type = "gpu"
+      keda_scalers = {
+        time_scaler = var.default_time_scaler
+      }
     }
     "image-classification-model" = {
       short_name        = "image-classification-model"
@@ -377,16 +407,7 @@ module "eks-karpenter" {
       }
       workload-type = "gpu"
       keda_scalers = {
-        time_scaler = {
-          minReplicas      = 0
-          fallbackReplicas = 0
-          desiredReplicas  = 1
-          maxReplicas      = 3
-          pollingInterval  = 30
-          timezone         = "America/New_York" # Eastern Timezone
-          start            = "45 12 * * 1-5"    # 1245pm, Mon-Fri
-          end              = "15 12 * * 1-5"    # 1215pm, Mon-Fri
-        }
+        time_scaler = var.default_time_scaler
       }
     }
   }
