@@ -304,7 +304,7 @@ variable "primary_nodepool_max_cpu" {
 variable "primary_nodepool_max_mem" {
   description = "Maximum memory limit for primary nodes"
   type        = string
-  default     = "8Gi"
+  default     = "12Gi"
 }
 
 # General CPU compute node group
@@ -361,4 +361,18 @@ variable "nvidia_plugin_version" {
   description = "Version of the NVIDIA device plugin Helm chart"
   type        = string
   default     = "0.17.2"
+}
+
+variable "default_time_scaler" {
+  description = "The default time scaler settings"
+  default = {
+    minReplicas      = 0
+    fallbackReplicas = 0
+    desiredReplicas  = 1
+    maxReplicas      = 2
+    pollingInterval  = 30
+    timezone         = "America/Los_Angeles" # Pacific timezone
+    start            = "0 7 * * 1-5"         # 7am, Mon-Fri
+    end              = "0 21 * * 1-5"        # 9pm, Mon-Fri
+  }
 }

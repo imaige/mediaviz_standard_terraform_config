@@ -311,7 +311,7 @@ resource "kubernetes_manifest" "karpenter_primary_nodepool" {
         "memory" = var.primary_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmpty"
+        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
         "consolidateAfter"    = "30s"
       }
       "template" = {
@@ -445,7 +445,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
         "memory" = var.evidence_gpu_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmpty"
+        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
         "consolidateAfter"    = "30s"
       }
       "template" = {
@@ -589,7 +589,7 @@ resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
         "memory" = var.gpu_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmpty",
+        "consolidationPolicy" = "WhenEmptyOrUnderutilized",
         "consolidateAfter"    = "30s"
       }
       "template" = {
@@ -1617,22 +1617,22 @@ resource "helm_release" "model_deployments" {
   # Resource and limits
   set {
     name  = "resources.limits.cpu"
-    value = each.value.resources.limits.cpu
+    value = tostring(lookup(each.value.resources.limits, "cpu", 1))
   }
 
   set {
     name  = "resources.limits.memory"
-    value = each.value.resources.limits.mem
+    value = tostring(lookup(each.value.resources.limits, "mem", "2Gi"))
   }
 
   set {
     name  = "resources.requests.cpu"
-    value = each.value.resources.requests.cpu
+    value = tostring(lookup(each.value.resources.requests, "cpu", "500m"))
   }
 
   set {
     name  = "resources.requests.memory"
-    value = each.value.resources.requests.mem
+    value = tostring(lookup(each.value.resources.requests, "mem", "1Gi"))
   }
 
   # not every service requests or limits by storage
