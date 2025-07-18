@@ -311,8 +311,8 @@ resource "kubernetes_manifest" "karpenter_primary_nodepool" {
         "memory" = var.primary_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
-        "consolidateAfter"    = "720h"
+        "consolidationPolicy" = "WhenEmpty"
+        "consolidateAfter"    = "30s"
       }
       "template" = {
         "metadata" = {
@@ -322,6 +322,7 @@ resource "kubernetes_manifest" "karpenter_primary_nodepool" {
           }
         }
         "spec" = {
+          "expireAfter" = "72h"
           "nodeClassRef" = {
             "group" = "karpenter.k8s.aws"
             "kind"  = "EC2NodeClass"
@@ -444,8 +445,8 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
         "memory" = var.evidence_gpu_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
-        "consolidateAfter"    = "720h"
+        "consolidationPolicy" = "WhenEmpty"
+        "consolidateAfter"    = "30s"
       }
       "template" = {
         "metadata" = {
@@ -454,6 +455,7 @@ resource "kubernetes_manifest" "karpenter_high_power_gpu_nodepool" {
           }
         }
         "spec" = {
+          "expireAfter" = "72h"
           "nodeClassRef" = {
             "group" = "karpenter.k8s.aws"
             "kind"  = "EC2NodeClass"
@@ -587,8 +589,8 @@ resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
         "memory" = var.gpu_nodepool_max_mem
       }
       "disruption" = {
-        "consolidationPolicy" = "WhenEmptyOrUnderutilized"
-        "consolidateAfter"    = "720h"
+        "consolidationPolicy" = "WhenEmpty",
+        "consolidateAfter"    = "30s"
       }
       "template" = {
         "metadata" = {
@@ -597,6 +599,7 @@ resource "kubernetes_manifest" "karpenter_gpu_nodepool" {
           }
         }
         "spec" = {
+          "expireAfter" = "72h"
           "nodeClassRef" = {
             "group" = "karpenter.k8s.aws"
             "kind"  = "EC2NodeClass"
@@ -707,8 +710,8 @@ resource "kubernetes_manifest" "time_scaler" {
       }
 
       # Min/Max pod replicas
-      minReplicaCount = lookup(each.value, "minReplica", 1)
-      maxReplicaCount = lookup(each.value, "maxReplica", 5)
+      minReplicaCount = lookup(each.value, "minReplicas", 1)
+      maxReplicaCount = lookup(each.value, "maxReplicas", 5)
       pollingInterval = lookup(each.value, "pollingInterval", 30)
 
       # Scaling triggers
@@ -727,7 +730,7 @@ resource "kubernetes_manifest" "time_scaler" {
       ]
       fallback = {
         failureThreshold = lookup(each.value, "failureThreshold", 3)
-        replicas         = lookup(each.value, "minReplica", 2)
+        replicas         = lookup(each.value, "fallbackReplicas", 2)
       }
     }
   }

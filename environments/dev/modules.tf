@@ -234,7 +234,7 @@ module "eks-karpenter" {
       needs_rekognition = true
       needs_helm        = true
       needs_gpu         = false
-      replicas          = 1
+      replicas          = 0
       #image             = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-repository"
       image_tag = "latest"
       resources = {
@@ -252,9 +252,9 @@ module "eks-karpenter" {
       workload-type = "primary"
       keda_scalers = {
         time_scaler = {
-          minReplica      = 1
+          minReplicas     = 1
           desiredReplicas = 2
-          maxReplica      = 5
+          maxReplicas     = 5
           pollingInterval = 30
           timezone        = "America/Los_Angeles" # Pacific timezone
           start           = "0 7 * * 1-5"         # 5am, Mon-Fri
@@ -292,7 +292,7 @@ module "eks-karpenter" {
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = true
-      replicas          = 1
+      replicas          = 0
       image_tag         = "latest"
       resources = {
         limits = {
@@ -309,6 +309,18 @@ module "eks-karpenter" {
         }
       }
       workload-type = "gpu"
+      keda_scalers = {
+        time_scaler = {
+          minReplica       = 0
+          fallbackReplicas = 0
+          desiredReplicas  = 1
+          maxReplica       = 3
+          pollingInterval  = 30
+          timezone         = "America/New_York" # Eastern Timezone
+          start            = "45 12 * * 1-5"    # 1245pm, Mon-Fri
+          end              = "15 12 * * 1-5"    # 1215pm, Mon-Fri
+        }
+      }
     }
     "similarity-set-sorting-service" = {
       short_name        = "similarity-set-sorting"
@@ -339,7 +351,7 @@ module "eks-karpenter" {
       needs_rekognition = false
       needs_helm        = true
       needs_gpu         = true
-      replicas          = 1
+      replicas          = 0
       image_tag         = "latest"
       resources = {
         limits = {
@@ -350,13 +362,24 @@ module "eks-karpenter" {
         }
         requests = {
           cpu     = "1"
-          storage = "8i"
+          storage = "500Mi"
           mem     = "1Gi"
           gpu     = 1
         }
       }
-      workload-type  = "gpu"
-      gpus_requested = "1"
+      workload-type = "gpu"
+      keda_scalers = {
+        time_scaler = {
+          minReplicas      = 0
+          fallbackReplicas = 0
+          desiredReplicas  = 1
+          maxReplicas      = 3
+          pollingInterval  = 30
+          timezone         = "America/New_York" # Eastern Timezone
+          start            = "45 12 * * 1-5"    # 1245pm, Mon-Fri
+          end              = "15 12 * * 1-5"    # 1215pm, Mon-Fri
+        }
+      }
     }
   }
 
