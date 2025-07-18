@@ -121,9 +121,15 @@ locals {
     for k, v in var.models : k => v if v.needs_helm
   }
 
+  # Each time we add a KEDA scaler, we need to update this map
+  keda_scalers = {
+    time_scalers = {
+      for k, v in var.models : k => v.keda_scalers.time_scaler if can(v.keda_scalers.time_scaler)
+    }
+  }
+
   similarity_set_sorting_service_url = data.kubernetes_secret.secrets.data["SIMILARITY_SORTING_SERVICE_URL"]
 }
-
 
 resource "aws_iam_role" "fargate_pod_execution_role" {
   name = "${var.project_name}-${var.env}-karpenter-fargate-pod-execution-role"
@@ -677,6 +683,55 @@ resource "helm_release" "keda" {
   }
 }
 
+resource "kubernetes_manifest" "time_scaler" {
+  for_each = local.keda_scalers.time_scalers
+
+  depends_on = [
+    helm_release.keda
+  ]
+
+  manifest = {
+    apiVersion = "keda.sh/v1alpha1"
+    kind       = "ScaledObject"
+
+    metadata = {
+      name      = "${each.key}-time-scaler"
+      namespace = "default"
+    }
+
+    spec = {
+      scaleTargetRef = {
+        apiVersion = "apps/v1"
+        kind       = "Deployment"
+        name       = "${helm_release.model_deployments[each.key].name}-karpenter"
+      }
+
+      # Min/Max pod replicas
+      minReplicaCount = lookup(each.value, "minReplica", 1)
+      maxReplicaCount = lookup(each.value, "maxReplica", 5)
+      pollingInterval = lookup(each.value, "pollingInterval", 30)
+
+      # Scaling triggers
+      triggers = [
+        {
+          type = "cron"
+          metadata = {
+            timezone = lookup(each.value, "timezone", "America/Los_Angeles")
+
+            start = lookup(each.value, "start", "0 8 * * 1-5")
+            end   = lookup(each.value, "end", "0 18 * * 1-5")
+
+            desiredReplicas = tostring(lookup(each.value, "desiredReplicas", 2))
+          }
+        },
+      ]
+      fallback = {
+        failureThreshold = lookup(each.value, "failureThreshold", 3)
+        replicas         = lookup(each.value, "minReplica", 2)
+      }
+    }
+  }
+}
 
 # Role for EBS CSI driver with IRSA
 resource "aws_iam_role" "ebs_csi_role" {

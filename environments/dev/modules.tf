@@ -250,6 +250,17 @@ module "eks-karpenter" {
         }
       }
       workload-type = "primary"
+      keda_scalers = {
+        time_scaler = {
+          minReplica      = 1
+          desiredReplicas = 2
+          maxReplica      = 5
+          pollingInterval = 30
+          timezone        = "America/Los_Angeles" # Pacific timezone
+          start           = "0 7 * * 1-5"         # 5am, Mon-Fri
+          end             = "0 16 * * 1-5"        # 7pm, Mon-Fri
+        }
+      }
     }
     "feature-extraction-model" = {
       short_name        = "feature-extraction-model"
